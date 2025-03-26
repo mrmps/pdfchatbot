@@ -2,9 +2,7 @@ from fastapi import FastAPI,HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import kdbai_client as kdbai
-import pandas as pd
 from fastapi import FastAPI, HTTPException
-import pandas as pd
 from contextlib import asynccontextmanager
 import openai
 from dotenv import load_dotenv
@@ -198,8 +196,8 @@ async def upload_pdf(request: Request):
             max_id_query = "select max(id) as max_id from pdf_chunks"
             max_id_result = table.query(max_id_query)
             next_id = 1
-            if max_id_result is not None and not max_id_result.empty and not pd.isna(max_id_result["max_id"].iloc[0]):
-                next_id = int(max_id_result["max_id"].iloc[0]) + 1
+            if max_id_result is not None and len(max_id_result) > 0 and max_id_result[0].get('max_id') is not None:
+                next_id = int(max_id_result[0]['max_id']) + 1
             print(f"Starting with ID: {next_id}")
         except Exception as e:
             print(f"Error getting max ID: {str(e)}")
@@ -266,7 +264,7 @@ async def upload_pdf(request: Request):
         embedding_time = time.time() - start_time
         print(f"Embedding completed in {embedding_time:.2f} seconds ({total_chunks / embedding_time:.2f} chunks/sec)")
         
-        # Third pass: create data frames and insert into database
+        # Third pass: create data and insert into database
         all_data_rows = []
         insertion_time = 0  # Define with default value to avoid reference errors
         
@@ -301,10 +299,9 @@ async def upload_pdf(request: Request):
                 "chunks": len(chunks)
             })
         
-        # Create a single DataFrame with all data
+        # Insert all data
         if all_data_rows:
             print(f"Preparing to insert {len(all_data_rows)} rows into database")
-            all_data_df = pd.DataFrame(all_data_rows)
             
             # Use larger batch size for more efficient inserts
             batch_size = 1000
@@ -312,7 +309,7 @@ async def upload_pdf(request: Request):
             # Insert in batches
             start_time = time.time()
             for i in range(0, len(all_data_rows), batch_size):
-                batch = all_data_df.iloc[i:i+batch_size]
+                batch = all_data_rows[i:i+batch_size]
                 table.insert(batch)
                 print(f"Inserted batch {i//batch_size + 1}/{(len(all_data_rows) + batch_size - 1)//batch_size}, rows {i} to {min(i+batch_size-1, len(all_data_rows)-1)}")
             
@@ -389,17 +386,16 @@ async def search(user_id: str, query: str, pdf_id: list[str] = Query(None), sear
                 )
                 
                 # Process results for this PDF ID
-                if results and len(results) > 0 and not results[0].empty:
-                    pdf_results = [
-                        {
+                if results and len(results) > 0 and results[0]:
+                    pdf_results = []
+                    for row in results[0]:
+                        pdf_results.append({
                             "pdf_id": row["pdf_id"],
                             "pdf_name": row["pdf_name"],
                             "chunk_text": row["chunk_text"],
                             "chunk_index": row.get("chunk_index", 0),  # Include chunk index if available
                             "distance": row["__nn_distance"]
-                        }
-                        for _, row in results[0].iterrows()
-                    ]
+                        })
                     all_results.extend(pdf_results)
             
             # Sort combined results by distance (relevance)
@@ -434,17 +430,16 @@ async def search(user_id: str, query: str, pdf_id: list[str] = Query(None), sear
             )
             
             # Process results
-            if results and len(results) > 0 and not results[0].empty:
-                response = [
-                    {
+            if results and len(results) > 0 and results[0]:
+                response = []
+                for row in results[0]:
+                    response.append({
                         "pdf_id": row["pdf_id"],
                         "pdf_name": row["pdf_name"],
                         "chunk_text": row["chunk_text"],
                         "chunk_index": row.get("chunk_index", 0),  # Include chunk index if available
                         "distance": row["__nn_distance"]
-                    }
-                    for _, row in results[0].iterrows()
-                ]
+                    })
                 return {"results": response}
             
             return {"results": []}
@@ -461,8 +456,19 @@ def list_pdf_names(user_id: str):
         results = table.query(filter=[["=", "user_id", user_id]])
         
         # Check if results exist and extract unique PDF names and IDs
-        if results is not None and not results.empty:
-            pdf_data = results[["pdf_id", "pdf_name"]].drop_duplicates().to_dict('records')
+        if results is not None and results:
+            # Create a dictionary to track unique PDF IDs
+            unique_pdfs = {}
+            for row in results:
+                pdf_id = row["pdf_id"]
+                if pdf_id not in unique_pdfs:
+                    unique_pdfs[pdf_id] = {
+                        "pdf_id": pdf_id,
+                        "pdf_name": row["pdf_name"]
+                    }
+            
+            # Convert dictionary values to list
+            pdf_data = list(unique_pdfs.values())
             return {"pdfs": pdf_data}
         
         return {"pdfs": []}
@@ -500,15 +506,15 @@ def get_chunks_by_pdf_ids(
             limit=limit
         )
         
-        print(f"Query returned {len(results) if results is not None and not results.empty else 0} results")
+        print(f"Query returned {len(results) if results is not None else 0} results")
         
         # Check if results exist
-        if results is None or results.empty:
+        if results is None or not results:
             return {"chunks": []}
         
         # Convert results to a list of dictionaries
         chunks = []
-        for _, row in results.iterrows():
+        for row in results:
             chunks.append({
                 "id": int(row["id"]),
                 "pdf_id": str(row["pdf_id"]),

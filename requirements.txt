@@ -3,8 +3,6 @@ uvicorn[standard]==0.30.6
 python-multipart==0.0.9
 pydantic>=2.5.2
 python-dotenv>=1.0.1
-numpy>=1.26.4
-pandas>=2.0.0
 kdbai-client>=1.0.0
 openai>=1.0.0
 uuid>=0.0.1
