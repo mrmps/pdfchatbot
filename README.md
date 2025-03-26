@@ -1,59 +1,104 @@
+# PDF Chat with KDB.AI
+
 <p align="center">
-  <a href="https://nextjs-fastapi-starter.vercel.app/">
-    <img src="https://assets.vercel.com/image/upload/v1588805858/repositories/vercel/logo.png" height="96">
-    <h3 align="center">Next.js FastAPI Starter</h3>
-  </a>
+  <img src="https://assets.vercel.com/image/upload/v1588805858/repositories/vercel/logo.png" height="96">
+  <h3 align="center">Chat with your PDFs using AI and vector search</h3>
 </p>
 
-<p align="center">Simple Next.j 14 boilerplate that uses <a href="https://fastapi.tiangolo.com/">FastAPI</a> as the API backend.</p>
-
-<br/>
+<p align="center">Built on the <a href="https://github.com/digitros/nextjs-fastapi">Next.js FastAPI Starter</a> template, deployable as a single application on Vercel.</p>
 
 ## Introduction
 
-This is a hybrid Next.js 14 + Python template. One great use case of this is to write Next.js apps that use Python AI libraries on the backend, while still having the benefits of Next.js Route Handlers and Server Side Rendering.
+This application allows users to upload PDFs, process them into searchable chunks, and chat with their documents using AI. It combines Next.js for the frontend with Python's AI capabilities on the backend, all deployable as a single application on Vercel.
+
+## Key Features
+
+- **PDF Processing**: Upload and process PDFs using PyPDF2
+- **Vector Search**: Store and query document chunks using KDB.AI vector database
+- **AI Chat**: Interact with your documents using natural language
+- **Single Deployment**: Deploy both frontend and backend on Vercel
+- **No Login Required**: Uses fingerprinting for anonymous user identification
+
+## Architecture
+
+The application consists of:
+
+1. **Next.js Frontend**: Handles UI and user interactions
+2. **FastAPI Backend**: Processes PDFs and manages vector database operations
+3. **KDB.AI**: Vector database for semantic search
+4. **OpenAI**: Provides embeddings and AI capabilities
+
+```mermaid
+graph TD
+    User[User] --> Frontend[Next.js Frontend]
+    Frontend --> UploadPDF[Upload PDF]
+    Frontend --> ChatInterface[Chat Interface]
+    Frontend --> ViewPDF[View PDF Content]
+    
+    UploadPDF --> FastAPI[FastAPI Backend]
+    ChatInterface --> NextRoutes[Next.js API Routes]
+    ViewPDF --> FastAPI
+    
+    FastAPI --> PyPDF2[PyPDF2 Text Extraction]
+    PyPDF2 --> TextChunking[Text Chunking]
+    TextChunking --> Embeddings[OpenAI Embeddings]
+    Embeddings --> KDBAI[KDB.AI Vector Database]
+    
+    NextRoutes --> AITools[AI Tools]
+    AITools --> SearchPDFs[searchPdfs Tool]
+    SearchPDFs --> FastAPI
+    FastAPI --> KDBAI
+    
+    KDBAI --> Results[Search Results]
+    Results --> AITools
+    AITools --> Response[AI Response]
+    Response --> ChatInterface
+```
 
 ## How It Works
 
-The Python/FastAPI server is mapped into to Next.js app under `/api/`.
+### PDF Processing Flow
 
-This is implemented using [`next.config.js` rewrites](https://github.com/digitros/nextjs-fastapi/blob/main/next.config.js) to map any request to `/api/py/:path*` to the FastAPI API, which is hosted in the `/api` folder.
+1. User uploads PDFs through the UI
+2. FastAPI backend extracts text using PyPDF2
+3. Text is split into manageable chunks
+4. OpenAI generates embeddings for each chunk
+5. Chunks and embeddings are stored in KDB.AI vector database
 
-Also, the app/api routes are available on the same domain, so you can use NextJs Route Handlers and make requests to `/api/...`.
+### Chat Flow
 
-On localhost, the rewrite will be made to the `127.0.0.1:8000` port, which is where the FastAPI server is running.
+1. User asks a question about their documents
+2. AI uses the `searchPdfs` tool to find relevant information
+3. The tool queries KDB.AI for semantically similar content
+4. Results are formatted and returned to the AI
+5. AI generates a response based on the retrieved information
 
-In production, the FastAPI server is hosted as [Python serverless functions](https://vercel.com/docs/concepts/functions/serverless-functions/runtimes/python) on Vercel.
+### Deployment Architecture
 
-## Demo
+This project leverages the [Next.js FastAPI Starter template](https://github.com/digitros/nextjs-fastapi), which allows for deploying both the Next.js frontend and Python/FastAPI backend as a single application on Vercel.
 
-https://nextjs-fastapi-starter.vercel.app/
+The Python/FastAPI server is mapped into the Next.js app under `/api/`, implemented using `next.config.js` rewrites. This architecture means you don't need to deploy the backend and frontend separately.
 
-## Deploy Your Own
+## Environment Setup
 
-You can clone & deploy it to Vercel with one click:
+Create a `.env.local` file with:
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fdigitros%2Fnextjs-fastapi%2Ftree%2Fmain)
-
-## Developing Locally
-
-You can clone & create this repo with the following command
-
-```bash
-npx create-next-app nextjs-fastapi --example "https://github.com/digitros/nextjs-fastapi"
+```
+KDBAI_ENDPOINT="your-kdb-ai-endpoint"
+KDBAI_API_KEY="your-kdb-ai-api-key"
+OPENAI_API_KEY="your-openai-api-key"
+NEXT_PUBLIC_API_URL="http://127.0.0.1:8000"
 ```
 
-## Getting Started
+## Local Development
 
-First, create and activate a virtual environment:
-
+1. Create and activate a virtual environment:
 ```bash
 python3 -m venv venv
-source venv/bin/activate
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
-Then, install the dependencies:
-
+2. Install dependencies:
 ```bash
 npm install
 # or
@@ -62,8 +107,7 @@ yarn
 pnpm install
 ```
 
-Then, run the development server(python dependencies will be installed automatically here):
-
+3. Run the development server:
 ```bash
 npm run dev
 # or
@@ -72,16 +116,23 @@ yarn dev
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+This will start both the Next.js frontend and FastAPI backend. The frontend will be available at http://localhost:3000 and the API at http://127.0.0.1:8000.
 
-The FastApi server will be running on [http://127.0.0.1:8000](http://127.0.0.1:8000) – feel free to change the port in `package.json` (you'll also need to update it in `next.config.js`).
+## Deploy Your Own
+
+You can clone & deploy it to Vercel with one click:
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fyour-username%2Fpdf-chat-kdbai)
 
 ## Learn More
 
-To learn more about Next.js, take a look at the following resources:
+- [KDB.AI Documentation](https://kdb.ai/) - Learn about KDB.AI vector database
+- [Next.js FastAPI Starter](https://github.com/digitros/nextjs-fastapi) - The template this project is based on
+- [PyPDF2 Documentation](https://pypdf2.readthedocs.io/) - PDF processing library
+- [OpenAI Documentation](https://platform.openai.com/docs/) - For embeddings and AI capabilities
+- [Next.js Documentation](https://nextjs.org/docs) - Learn about Next.js features and API
+- [FastAPI Documentation](https://fastapi.tiangolo.com/) - Learn about FastAPI features and API
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-- [FastAPI Documentation](https://fastapi.tiangolo.com/) - learn about FastAPI features and API.
+## License
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+This project is licensed under the MIT License - see the LICENSE file for details.
