@@ -46,9 +46,15 @@ export function ChatInterface() {
   };
   
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && e.metaKey) {
-      e.preventDefault();
-      handleSubmit(e as unknown as React.FormEvent<HTMLFormElement>);
+    if (e.key === 'Enter') {
+      if (e.shiftKey) {
+        // Allow shift+enter to create a new line
+        return;
+      } else {
+        // Regular enter submits the form
+        e.preventDefault();
+        handleSubmit(e as unknown as React.FormEvent<HTMLFormElement>);
+      }
     }
   };
   

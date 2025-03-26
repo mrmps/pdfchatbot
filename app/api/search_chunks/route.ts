@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 
 // Define an interface for the search result
 interface SearchResult {
@@ -11,14 +11,16 @@ interface SearchResult {
   // Add any other properties that might be in the result
 }
 
-export async function GET(req: Request) {
+export const dynamic = 'force-dynamic'; // This makes the route dynamic
+
+export async function GET(req: NextRequest) {
   try {
-    // Get query parameters from the URL
-    const url = new URL(req.url)
-    const query = url.searchParams.get('query')
-    const pdf_id = url.searchParams.get('pdf_id')
-    const limit = parseInt(url.searchParams.get('limit') || '5')
-    const user_id = url.searchParams.get('user_id') || 'anonymous-user'
+    // Use NextRequest's searchParams instead of URL
+    const searchParams = req.nextUrl.searchParams
+    const query = searchParams.get('query')
+    const pdf_id = searchParams.get('pdf_id')
+    const limit = parseInt(searchParams.get('limit') || '5')
+    const user_id = searchParams.get('user_id') || 'anonymous-user'
     
     if (!query) {
       return NextResponse.json(
@@ -28,7 +30,7 @@ export async function GET(req: Request) {
     }
     
     // Build the search URL with query parameters
-    const searchUrl = new URL(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/search`)
+    const searchUrl = new URL(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/api/py/search`)
     searchUrl.searchParams.append("user_id", user_id)
     searchUrl.searchParams.append("query", query)
     

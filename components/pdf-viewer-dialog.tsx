@@ -58,6 +58,51 @@ export function PdfViewerDialog({ open, onOpenChange }: PdfViewerDialogProps) {
 
   // Fetch PDF list and content whenever the dialog opens
   useEffect(() => {
+    // Define the fetch function inside useEffect
+    async function fetchPdfData() {
+      if (!userId) {
+        console.error("User ID not available");
+        setPdfContent("Error: User ID not available. Please refresh the page.");
+        return;
+      }
+
+      setIsLoading(true);
+      setPdfContent("Loading PDF content...");
+      
+      try {
+        console.log("Fetching PDF data from API...");
+        
+        // Get the list of PDFs with the userId
+        const pdfListData = await listPdfNames(userId);
+        const pdfs = pdfListData.pdfs || [];
+        setPdfList(pdfs);
+        setFilteredPdfList(pdfs);
+        
+        if (pdfs.length === 0) {
+          setPdfContent("No PDFs uploaded yet. Upload some PDFs to see their content here.");
+          setIsLoading(false);
+          return;
+        }
+        
+        // Clear the selected PDF when refreshing the list
+        setSelectedPdf(null);
+        setFormattedChunks([]);
+        
+        // Reset the chunks cache
+        setChunksByPdfId({});
+        
+        // We'll no longer fetch all chunks at once to improve performance
+        // Instead, we'll fetch chunks for each PDF when it's selected
+        
+        setPdfContent("Select a PDF from the list to view its content");
+      } catch (error) {
+        console.error("Error retrieving PDF data:", error);
+        setPdfContent(`Error loading PDF content: ${error instanceof Error ? error.message : String(error)}`);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
     if (open && userId) {
       fetchPdfData();
     }
@@ -74,50 +119,6 @@ export function PdfViewerDialog({ open, onOpenChange }: PdfViewerDialogProps) {
       setFilteredPdfList(filtered);
     }
   }, [searchQuery, pdfList]);
-
-  const fetchPdfData = async () => {
-    if (!userId) {
-      console.error("User ID not available");
-      setPdfContent("Error: User ID not available. Please refresh the page.");
-      return;
-    }
-
-    setIsLoading(true);
-    setPdfContent("Loading PDF content...");
-    
-    try {
-      console.log("Fetching PDF data from API...");
-      
-      // Get the list of PDFs with the userId
-      const pdfListData = await listPdfNames(userId);
-      const pdfs = pdfListData.pdfs || [];
-      setPdfList(pdfs);
-      setFilteredPdfList(pdfs);
-      
-      if (pdfs.length === 0) {
-        setPdfContent("No PDFs uploaded yet. Upload some PDFs to see their content here.");
-        setIsLoading(false);
-        return;
-      }
-      
-      // Clear the selected PDF when refreshing the list
-      setSelectedPdf(null);
-      setFormattedChunks([]);
-      
-      // Reset the chunks cache
-      setChunksByPdfId({});
-      
-      // We'll no longer fetch all chunks at once to improve performance
-      // Instead, we'll fetch chunks for each PDF when it's selected
-      
-      setPdfContent("Select a PDF from the list to view its content");
-    } catch (error) {
-      console.error("Error retrieving PDF data:", error);
-      setPdfContent(`Error loading PDF content: ${error instanceof Error ? error.message : String(error)}`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleCopyChunk = (index: number, text: string) => {
     navigator.clipboard.writeText(text);

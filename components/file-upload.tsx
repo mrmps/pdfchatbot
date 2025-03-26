@@ -12,6 +12,9 @@ interface FileUploadProps {
   onUploadComplete: (files?: File[]) => void
 }
 
+// Maximum file size: 30MB
+const MAX_FILE_SIZE = 30 * 1024 * 1024; // 30MB in bytes
+
 export function FileUpload({ onUploadComplete }: FileUploadProps) {
   const [files, setFiles] = useState<File[]>([])
   const [uploading, setUploading] = useState(false)
@@ -41,13 +44,25 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      // Limit to 3 files
-      const selectedFiles = Array.from(e.target.files).slice(0, 3)
-      setFiles(selectedFiles)
-      setError(null) // Clear any previous errors
+      // Check file sizes and limit to 3 files
+      const selectedFiles = Array.from(e.target.files)
+        .filter(file => {
+          if (file.size > MAX_FILE_SIZE) {
+            setError(`File "${file.name}" exceeds the 30MB size limit`);
+            return false;
+          }
+          return true;
+        })
+        .slice(0, 3);
+      
+      setFiles(selectedFiles);
+      
+      if (selectedFiles.length > 0) {
+        setError(null); // Clear any previous errors
+      }
       
       if (e.target.files.length > 3) {
-        setError("Only the first 3 PDFs will be processed")
+        setError("Only the first 3 PDFs will be processed");
       }
     }
   }
@@ -126,9 +141,18 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
     e.stopPropagation()
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      // Filter for PDF files only
+      // Filter for PDF files only and check size limits
       const pdfFiles = Array.from(e.dataTransfer.files)
-        .filter((file) => file.type === "application/pdf")
+        .filter((file) => {
+          if (file.type !== "application/pdf") {
+            return false;
+          }
+          if (file.size > MAX_FILE_SIZE) {
+            setError(`File "${file.name}" exceeds the 30MB size limit`);
+            return false;
+          }
+          return true;
+        })
         .slice(0, 3) // Limit to 3 files
 
       if (pdfFiles.length > 0) {
@@ -139,7 +163,7 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
           setError("Only the first 3 PDFs will be processed")
         }
       } else {
-        setError("Please drop PDF files only")
+        setError("Please drop valid PDF files (max 30MB each)")
       }
     }
   }
@@ -172,7 +196,7 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
         >
           <Upload className="mx-auto h-12 w-12 text-gray-400" />
           <p className="mt-2 text-sm text-gray-600">Drag and drop your PDFs here or click to browse</p>
-          <p className="mt-1 text-xs text-gray-500">Upload up to three PDFs at a time</p>
+          <p className="mt-1 text-xs text-gray-500">Upload up to three PDFs at a time (max 30MB each)</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -184,6 +208,9 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
               <li key={index} className="flex items-center text-sm">
                 <File className="h-4 w-4 mr-2 flex-shrink-0" />
                 <span className="truncate">{file.name}</span>
+                <span className="ml-2 text-xs text-gray-500">
+                  {(file.size / (1024 * 1024)).toFixed(2)} MB
+                </span>
               </li>
             ))}
           </ul>
@@ -214,4 +241,3 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
     </div>
   )
 }
-
