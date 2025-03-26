@@ -1,6 +1,7 @@
 import { openai } from '@ai-sdk/openai';
 import { streamText, tool } from 'ai';
 import { z } from 'zod';
+import { getApiUrl } from '@/lib/constants';
 
 export const maxDuration = 60;
 
@@ -20,12 +21,10 @@ export async function POST(req: Request) {
     
     console.log("Received messages:", JSON.stringify(messages).substring(0, 100) + "...");
 
-    // If NEXT_PUBLIC_API_URL is not set, use a relative URL
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL 
-      ? `${process.env.NEXT_PUBLIC_API_URL}/api/py/list_pdf_names` 
-      : '/api/py/list_pdf_names';
-
-
+    // Get the full API URL for listing PDFs
+    const apiUrl = getApiUrl('api/py/list_pdf_names');
+    
+    // Create URL with the full API URL
     const url = new URL(apiUrl);
     
     url.searchParams.append('user_id', userIdToUse);
@@ -107,12 +106,10 @@ export async function POST(req: Request) {
             console.log(`Searching PDFs with query: "${query}"${pdfIds ? ` in PDF IDs: ${JSON.stringify(pdfIds)}` : ''}, mode: ${searchMode}`);
             
             try {
-              // If NEXT_PUBLIC_API_URL is not set, use a relative URL
-              const apiUrl = process.env.NEXT_PUBLIC_API_URL 
-                ? `${process.env.NEXT_PUBLIC_API_URL}/api/py/search` 
-                : '/api/py/search';
+              // Get the full API URL for searching
+              const apiUrl = getApiUrl('api/py/search');
               
-              // Create URL - for server components, we need a proper absolute URL
+              // Create URL with the full API URL
               const url = new URL(apiUrl);
               
               url.searchParams.append("user_id", userIdToUse);

@@ -1,23 +1,16 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { getApiUrl } from "./constants"
 
 /**
- * Helper function to construct API URLs that work in both development and production
- * @param endpoint The API endpoint path without leading slash (e.g. "api/py/upload_pdf")
- * @returns A proper URL string that works in both environments
+ * Helper function to create a URL object for API calls
+ * @param endpoint The API endpoint path
+ * @returns A URL object
  */
-function getApiUrl(endpoint: string): string {
-  // Remove any leading slash from the endpoint
-  const cleanEndpoint = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
-  
-  // If NEXT_PUBLIC_API_URL is set, use it as the base
-  if (process.env.NEXT_PUBLIC_API_URL) {
-    return `${process.env.NEXT_PUBLIC_API_URL}/${cleanEndpoint}`;
-  }
-  
-  // In production, use relative URLs that work with Next.js rewrites
-  return `/${cleanEndpoint}`;
+function createApiUrl(endpoint: string): URL {
+  const apiUrlString = getApiUrl(endpoint);
+  return new URL(apiUrlString);
 }
 
 interface PdfItem {
@@ -57,10 +50,8 @@ export async function uploadPdf(formData: FormData, userId: string) {
 
 export async function listPdfNames(userId: string) {
   try {
-    const apiUrl = getApiUrl('api/py/list_pdf_names');
-    
-    // Construct URL with query parameters
-    const url = new URL(apiUrl);
+    // Create URL using the helper function
+    const url = createApiUrl('api/py/list_pdf_names');
     
     url.searchParams.append('user_id', userId);
     
@@ -89,10 +80,8 @@ export async function getChunksByPdfIds(pdfIds: string[]) {
       return { chunks: [] };
     }
 
-    const apiUrl = getApiUrl('api/py/get_chunks_by_pdf_ids');
-    
-    // Construct URL with query parameters
-    const url = new URL(apiUrl);
+    // Create URL using the helper function
+    const url = createApiUrl('api/py/get_chunks_by_pdf_ids');
     
     // Add each PDF ID as a separate query parameter with the same name
     pdfIds.forEach(id => {
@@ -148,10 +137,8 @@ export async function getAllUserChunks(userId: string) {
 // Function to search for relevant chunks
 export async function searchChunks(query: string, userId: string, pdfIds?: string[]) {
   try {
-    const apiUrl = getApiUrl('api/py/search');
-
-    // Construct URL with query parameters
-    const url = new URL(apiUrl);
+    // Create URL using the helper function
+    const url = createApiUrl('api/py/search');
     
     url.searchParams.append('user_id', userId);
     url.searchParams.append('query', query);
