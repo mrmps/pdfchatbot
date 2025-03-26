@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { RecursiveCharacterTextSplitter } from 'langchain/text_splitter';
+import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
 
 export async function POST(request: Request) {

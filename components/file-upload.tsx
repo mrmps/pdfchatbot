@@ -13,10 +13,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { Progress } from "@/components/ui/progress"
-
-// Define a breakpoint for easier responsive styling
-const MOBILE_BREAKPOINT = "sm"; // 640px
 
 interface FileUploadProps {
   onUploadComplete: (files?: File[]) => void

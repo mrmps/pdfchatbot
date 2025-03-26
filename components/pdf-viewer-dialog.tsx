@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react"
 import { Loader2, FileText, Search, ChevronRight, Copy, Check, ChevronLeft, Menu } from "lucide-react"
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { getUserId } from "@/lib/user-id"
 import { listPdfNames, getChunksByPdfIds } from "@/lib/actions"
 import { Input } from "@/components/ui/input"
@@ -12,6 +11,14 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
+import {
+  Credenza,
+  CredenzaContent,
+  CredenzaHeader,
+  CredenzaTitle,
+  CredenzaDescription,
+  CredenzaBody,
+} from "@/components/ui/credenza"
 
 // Define types
 interface PdfItem {
@@ -205,18 +212,18 @@ export function PdfViewerDialog({ open, onOpenChange }: PdfViewerDialogProps) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl h-[85vh] sm:h-[85vh] p-0 gap-0 overflow-hidden bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800">
-        <div className="p-3 sm:p-4 md:p-6 border-b border-zinc-200 dark:border-zinc-800">
-          <DialogTitle className="text-lg sm:text-xl font-semibold text-zinc-900 dark:text-zinc-50">PDF Library</DialogTitle>
-          <DialogDescription className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5 sm:mt-1">
+    <Credenza open={open} onOpenChange={onOpenChange}>
+      <CredenzaContent className="p-0 gap-0 overflow-hidden bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 max-w-full sm:max-w-5xl">
+        <CredenzaHeader className="p-3 sm:p-4 md:p-6 border-b border-zinc-200 dark:border-zinc-800">
+          <CredenzaTitle className="text-lg sm:text-xl font-semibold text-zinc-900 dark:text-zinc-50">PDF Library</CredenzaTitle>
+          <CredenzaDescription className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5 sm:mt-1">
             View and explore your uploaded PDF documents
-          </DialogDescription>
-        </div>
+          </CredenzaDescription>
+        </CredenzaHeader>
 
-        <div className="flex flex-1 h-[calc(85vh-6rem)] sm:h-[calc(85vh-7rem)] md:h-[calc(85vh-8rem)] overflow-hidden">
+        <CredenzaBody className="flex-1 h-[60vh] sm:h-[70vh] overflow-hidden p-0">
           {isLoading && !selectedPdf ? (
-            <div className="w-full flex items-center justify-center">
+            <div className="w-full flex items-center justify-center h-full">
               <div className="flex flex-col items-center">
                 <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin text-primary mb-2" />
                 <span className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">Loading PDF library...</span>
@@ -228,7 +235,7 @@ export function PdfViewerDialog({ open, onOpenChange }: PdfViewerDialogProps) {
               <div 
                 className={cn(
                   "md:w-1/3 md:border-r border-zinc-200 dark:border-zinc-800 flex flex-col",
-                  "w-full",
+                  "w-full h-full",
                   !showMobileList && "hidden md:flex" // Hide on mobile when viewing content
                 )}
               >
@@ -283,7 +290,7 @@ export function PdfViewerDialog({ open, onOpenChange }: PdfViewerDialogProps) {
               {/* PDF content view */}
               <div 
                 className={cn(
-                  "md:flex-1 flex flex-col w-full",
+                  "md:flex-1 flex flex-col w-full h-full",
                   showMobileList && "hidden md:flex" // Hide on mobile when showing list
                 )}
               >
@@ -406,8 +413,8 @@ export function PdfViewerDialog({ open, onOpenChange }: PdfViewerDialogProps) {
               </div>
             </>
           )}
-        </div>
-      </DialogContent>
-    </Dialog>
+        </CredenzaBody>
+      </CredenzaContent>
+    </Credenza>
   );
 } 
