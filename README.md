@@ -18,6 +18,7 @@ This application allows users to upload PDFs, process them into searchable chunk
 - **AI Chat**: Interact with your documents using natural language
 - **Single Deployment**: Deploy both frontend and backend on Vercel
 - **No Login Required**: Uses fingerprinting for anonymous user identification
+- **AI SDK Tool Calling**: Uses Vercel's AI SDK for structured tool execution
 
 ## Architecture
 
@@ -27,6 +28,7 @@ The application consists of:
 2. **FastAPI Backend**: Processes PDFs and manages vector database operations
 3. **KDB.AI**: Vector database for semantic search
 4. **OpenAI**: Provides embeddings and AI capabilities
+5. **Vercel AI SDK**: Manages tool calling and AI interactions
 
 ```mermaid
 graph TD
@@ -44,7 +46,7 @@ graph TD
     TextChunking --> Embeddings[OpenAI Embeddings]
     Embeddings --> KDBAI[KDB.AI Vector Database]
     
-    NextRoutes --> AITools[AI Tools]
+    NextRoutes --> AITools[AI SDK Tools]
     AITools --> SearchPDFs[searchPdfs Tool]
     SearchPDFs --> FastAPI
     FastAPI --> KDBAI
@@ -72,6 +74,30 @@ graph TD
 3. The tool queries KDB.AI for semantically similar content
 4. Results are formatted and returned to the AI
 5. AI generates a response based on the retrieved information
+
+### AI SDK Tool Calling
+
+This application leverages [Vercel's AI SDK tool calling](https://sdk.vercel.ai/docs/ai-sdk-core/tools-and-tool-calling) functionality to enable structured interactions between the AI and the vector database. The main tool used is:
+
+```typescript
+searchPdfs: tool({
+  description: 'Search for information in the user's PDF documents',
+  parameters: z.object({
+    query: z.string().describe('The search query to find information in PDFs'),
+    pdfIds: z.array(z.string()).optional().describe('Optional specific PDF IDs to search within'),
+    searchMode: z.enum(['unified', 'individual']).optional().describe('Search mode')
+  }),
+  execute: async ({ query, pdfIds, searchMode = "unified" }) => {
+    // Implementation that searches KDB.AI and returns formatted results
+  }
+})
+```
+
+The AI SDK handles:
+- Tool definition with Zod schemas for type safety
+- Tool execution with proper error handling
+- Multi-step tool calling with `maxSteps` parameter
+- Streaming of tool results back to the UI
 
 ### Deployment Architecture
 
@@ -126,12 +152,14 @@ You can clone & deploy it to Vercel with one click:
 
 ## Learn More
 
-- [KDB.AI Documentation](https://kdb.ai/) - Learn about KDB.AI vector database
+- [KDB.AI](https://kdb.ai/) - Get your own KDB.AI vector database
+- [KDB.AI Documentation](https://code.kx.com/kdbai/latest) - Learn about KDB.AI vector database
 - [Next.js FastAPI Starter](https://github.com/digitros/nextjs-fastapi) - The template this project is based on
 - [PyPDF2 Documentation](https://pypdf2.readthedocs.io/) - PDF processing library
 - [OpenAI Documentation](https://platform.openai.com/docs/) - For embeddings and AI capabilities
 - [Next.js Documentation](https://nextjs.org/docs) - Learn about Next.js features and API
 - [FastAPI Documentation](https://fastapi.tiangolo.com/) - Learn about FastAPI features and API
+- [Vercel AI SDK Tool Calling](https://sdk.vercel.ai/docs/ai-sdk-core/tools-and-tool-calling) - Learn about AI SDK tool calling
 
 ## License
 
