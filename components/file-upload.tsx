@@ -13,6 +13,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { clientProcessPdfs } from "@/lib/client-pdf-parser"
 
 interface FileUploadProps {
   onUploadComplete: (files?: File[]) => void
@@ -183,40 +184,15 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
     setProcessingStage('Parsing PDFs')
 
     try {
-      // Create FormData to upload the actual files
-      const formData = new FormData();
-      
-      // Add each file to the formData
-      files.forEach(file => {
-        formData.append('files', file);
-      });
-      
-      // Add user ID
-      formData.append('userId', userId);
-      
       // Update processing stage
       setStatusMessage({
         type: 'info',
         text: "Extracting text from your PDFs..."
       });
       
-      // Send the files to the API for processing with timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 minute timeout
-      
-      const response = await fetch('/api/ingestPDFs', {
-        method: 'POST',
-        body: formData,
-        signal: controller.signal,
-      });
-      
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
-      }
-      
-      const result = await response.json();
+      // Process PDFs client-side instead of uploading to the API
+      setProgress(15);
+      const result = await clientProcessPdfs(files, userId);
       
       if (!result.success) {
         throw new Error(result.error || 'Failed to process PDFs');
@@ -226,7 +202,7 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
       setProgress(40);
       setProcessingStage('Extracting text')
       
-      // Process the chunks from the API response
+      // Process the chunks from the PDF processing result
       const parsed: {[filename: string]: ParsedChunk[]} = {};
       let totalChunks = 0;
       
@@ -247,6 +223,14 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
           chunks: chunks.map(chunk => chunk.text)
         }))
       };
+      
+      // Log payload structure for debugging
+      console.log("Payload structure:", {
+        userId: payload.userId,
+        documentCount: payload.documents.length,
+        totalChunks: totalChunks,
+        sampleChunk: payload.documents[0]?.chunks[0]?.substring(0, 50) + "..."
+      });
       
       // Set appropriate message based on chunk count
       setProgress(60);
@@ -269,70 +253,126 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
         });
       }
       
+      // Check if payload is too large - 5MB is a good limit for HTTP requests
+      const parsedDataJson = JSON.stringify(payload);
+      const payloadSizeInMB = parsedDataJson.length / (1024 * 1024);
+      console.log(`Payload size: ${payloadSizeInMB.toFixed(2)} MB`);
+      
+      // Record timing
+      const startTime = Date.now();
+      
       // Create FormData from the parsed chunks
       const uploadFormData = new FormData();
       uploadFormData.append('userId', userId);
-      uploadFormData.append('parsedData', JSON.stringify(payload));
+      uploadFormData.append('parsedData', parsedDataJson);
+      
+      // Log formData contents
+      console.log("FormData contents:", {
+        userId: uploadFormData.get('userId'),
+        parsedDataLength: parsedDataJson.length,
+        parsedDataSample: parsedDataJson.substring(0, 100) + "..."
+      });
+      
+      // Set up a progress update function based on expected time
+      const expectedDuration = Math.max(30, totalChunks / 10); // Rough estimate: 10 chunks per second
+      const progressUpdater = setInterval(() => {
+        setProgress((currentProgress) => {
+          if (currentProgress >= 95) {
+            clearInterval(progressUpdater);
+            return 95;
+          }
+          // Gradually increase progress, slowing down as it gets higher
+          const increment = Math.max(0.2, (95 - currentProgress) / 20);
+          return Math.min(95, currentProgress + increment);
+        });
+      }, 1000);
       
       // Send parsed chunks to backend with increased timeout
       const uploadController = new AbortController();
       const uploadTimeoutId = setTimeout(() => uploadController.abort(), 600000); // 10 minute timeout for very large documents
       
-      // Record timing
-      const startTime = Date.now();
-      
       // Send parsed chunks to backend
-      setProgress(75);
-      setProcessingStage('Vectorizing data')
+      setProgress(70);
+      setProcessingStage('Vectorizing data');
+      setStatusMessage({
+        type: 'info',
+        text: `Uploading and processing ${totalChunks.toLocaleString()} chunks...`
+      });
+      
       const uploadResult = await uploadPdf(uploadFormData, userId);
+      
+      // Clean up
+      clearInterval(progressUpdater);
+      clearTimeout(uploadTimeoutId);
       
       // Calculate elapsed time
       const elapsedSeconds = Math.round((Date.now() - startTime) / 1000);
       
-      clearTimeout(uploadTimeoutId);
-      
       if (uploadResult.success) {
         setProgress(100);
         setUploadComplete(true);
-        setProcessingStage('Complete')
+        setProcessingStage('Complete');
+        
+        const chunksInserted = uploadResult.chunks_inserted || uploadResult.total_chunks_inserted || 0;
+        const docsProcessed = uploadResult.documents_processed || payload.documents.length;
         
         // Show success message with timing information
-        if (uploadResult.processing_time) {
-          const { embedding_seconds, insertion_seconds } = uploadResult.processing_time;
-          const totalTime = embedding_seconds + insertion_seconds;
+        const processingTime = uploadResult.processing_time;
+        if (processingTime) {
+          const { embedding_seconds, insertion_seconds } = processingTime;
+          const totalServerTime = embedding_seconds + insertion_seconds;
           setStatusMessage({
             type: 'success',
-            text: `Processed ${totalChunks.toLocaleString()} chunks in ${elapsedSeconds}s${totalTime > 0 ? ` (server: ${Math.round(totalTime)}s)` : ''}`
+            text: `Processed ${chunksInserted.toLocaleString()} chunks from ${docsProcessed} document(s) in ${elapsedSeconds}s${totalServerTime > 0 ? ` (server: ${Math.round(totalServerTime)}s)` : ''}`
           });
         } else {
           setStatusMessage({
             type: 'success',
-            text: `Processed ${totalChunks.toLocaleString()} chunks in ${elapsedSeconds}s`
+            text: `Processed ${chunksInserted.toLocaleString()} chunks from ${docsProcessed} document(s) in ${elapsedSeconds}s`
           });
         }
-
+        
         // Reset after 5 seconds
         setTimeout(() => {
-          setFiles([])
-          setUploading(false)
-          setProgress(0)
-          setUploadComplete(false)
-          setParsedChunks({})
-          setProcessingStage('')
-
+          setFiles([]);
+          setUploading(false);
+          setProgress(0);
+          setUploadComplete(false);
+          setParsedChunks({});
+          setProcessingStage('');
+          
           // Call the callback if provided
           if (onUploadComplete) {
-            onUploadComplete(files)
+            onUploadComplete(files);
           }
-        }, 5000)
+        }, 5000);
       } else {
+        // Enhanced error handling with better context for the user
+        let errorMessage = uploadResult.error || "Upload failed";
+        let errorType = uploadResult.errorType || "unknown";
+        
+        // Enhanced error messaging based on error type
+        if (errorType === 'size_limit') {
+          errorMessage = `Your document contains too much text to process at once (${payloadSizeInMB.toFixed(1)} MB). Please try a smaller PDF or split it into multiple documents.`;
+        } else if (errorType === 'file_size') {
+          errorMessage = `The file(s) you're trying to upload are too large. Please reduce the size or try fewer documents.`;
+        } else if (errorType === 'timeout') {
+          errorMessage = `The server took too long to process your document. Try with a smaller PDF file.`;
+        }
+        
         setStatusMessage({
           type: 'error',
-          text: uploadResult.error || "Upload failed"
+          text: errorMessage
         });
-        setUploading(false)
-        setProgress(0)
-        setProcessingStage('')
+        
+        // For size-related errors, provide more guidance
+        if (errorType === 'size_limit' || errorType === 'file_size') {
+          console.warn(`Size-related error: ${payloadSizeInMB.toFixed(2)} MB payload exceeded limits`);
+        }
+        
+        setUploading(false);
+        setProgress(0);
+        setProcessingStage('');
       }
     } catch (error) {
       console.error("Upload failed:", error)

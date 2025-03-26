@@ -29,6 +29,11 @@ const nextConfig = {
       },
     ];
   },
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '50mb',
+    },
+  },
 };
 
 module.exports = withBundleAnalyzer(nextConfig);
