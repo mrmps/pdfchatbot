@@ -1,5 +1,6 @@
-from fastapi import FastAPI,HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from typing import List, Optional, Any, Dict
 import os
 import kdbai_client as kdbai
 from fastapi import FastAPI, HTTPException
@@ -10,6 +11,7 @@ import os
 import uuid
 import json
 import time
+import traceback
 
 # Load environment variables from .env file
 load_dotenv()
@@ -342,111 +344,188 @@ async def upload_pdf(request: Request):
         raise
     except Exception as e:
         print(f"Upload error: {str(e)}")
-        import traceback
         traceback.print_exc()
         raise HTTPException(
             status_code=500, 
             detail=f"Error processing PDFs: {str(e)}"
         )
 
+def _process_result_row(row: Any) -> Optional[Dict[str, Any]]:
+    """
+    Processes a single row from KDB.AI search results DataFrame.
+    Returns a formatted dictionary (pdf_id, pdf_name, chunk_text, distance)
+    or None if processing fails.
+    """
+    try:
+        # Skip string inputs (column names)
+        if isinstance(row, str):
+            return None
+            
+        # For DataFrame rows (pandas Series objects)
+        chunk_text = str(row["chunk_text"]) if "chunk_text" in row else ""
+        if not chunk_text:
+            return None
+            
+        return {
+            "pdf_id": str(row["pdf_id"]) if "pdf_id" in row else "",
+            "pdf_name": str(row["pdf_name"]) if "pdf_name" in row else "",
+            "chunk_text": chunk_text,
+            "chunk_index": int(row["chunk_index"]) if "chunk_index" in row else 0,
+            "distance": float(row["__nn_distance"]) if "__nn_distance" in row else 0.0,
+        }
+    except Exception as e:
+        print(f"Error processing row: {e}. Row type: {type(row)}")
+        return None
+
+def _process_search_results(results, pdf_id=None) -> List[Dict[str, Any]]:
+    """
+    Process search results from KDB.AI.
+    Returns a list of formatted results or an empty list if results are invalid.
+    """
+    processed_results = []
+    
+    if results and results[0] is not None and not results[0].empty:
+        df_results = results[0]  # Get the DataFrame
+        
+        # Log info based on whether this is for a specific PDF or all PDFs
+        if pdf_id:
+            print(f"  Processing DataFrame results for PDF {pdf_id}")
+        else:
+            print(f"Processing DataFrame with {len(df_results)} rows")
+        
+        # Process each row in the DataFrame
+        for _, row in df_results.iterrows():
+            processed = _process_result_row(row)
+            if processed:
+                processed_results.append(processed)
+        
+        # Log results count
+        if pdf_id:
+            print(f"  Found {len(processed_results)} valid results for PDF {pdf_id}")
+    elif pdf_id:
+        print(f"  No results or empty results for PDF {pdf_id}")
+    
+    return processed_results
+
 @app.get("/api/py/search")
-async def search(user_id: str, query: str, pdf_id: list[str] = Query(None), search_mode: str = "unified", limit: int = 20):
+async def search(
+    user_id: str,
+    query: str,
+    pdf_id: Optional[List[str]] = Query(None),
+    search_mode: str = "unified",
+    limit: int = 20
+):
     """
     Search across user's PDFs with flexible search modes.
-    
+
+    Returns results including pdf_id, pdf_name, chunk_text, and distance.
+
     search_mode options:
     - "unified": One search across all specified PDFs (or all user PDFs if none specified)
     - "individual": Separate searches for each PDF, returning top results from each
     """
+    print(f"Search request: user_id={user_id}, query='{query[:50]}...', pdf_id={pdf_id}, mode={search_mode}, limit={limit}")
+
+    if not user_id or not query:
+        raise HTTPException(status_code=422, detail="Missing required parameters: user_id and query")
+
     try:
-        # Print debug information
-        print(f"Search request: user_id={user_id}, query={query}, pdf_id={pdf_id}, search_mode={search_mode}, limit={limit}")
-        
-        if not user_id or not query:
-            raise HTTPException(status_code=422, detail="Missing required parameters: user_id and query")
-        
-        # Generate query embedding using OpenAI API directly
         query_embedding = embed_single_text(query)
-        
-        # Handle different search modes
-        if search_mode == "individual" and pdf_id:
-            # Individual searches for each PDF
-            all_results = []
-            pdf_ids = pdf_id if isinstance(pdf_id, list) else [pdf_id]
-            
-            for pid in pdf_ids:
+        vector_index_name = "vectorIndex"
+        final_results = []
+
+        # Normalize pdf_id to list format
+        pdf_ids_list = pdf_id if isinstance(pdf_id, list) else [pdf_id] if pdf_id else []
+
+        # CASE 1: Individual search mode - search each PDF separately, then combine
+        if search_mode == "individual" and pdf_ids_list:
+            # Calculate limit per PDF to ensure fair distribution
+            limit_per_pdf = max(3, limit // len(pdf_ids_list))
+            processed_results = []
+
+            # Search each PDF individually
+            for pid in pdf_ids_list:
                 filter_list = [["=", "user_id", user_id], ["=", "pdf_id", pid]]
-                print(f"Individual search with filter: {filter_list}")
+                print(f"Individual search for PDF {pid}...")
                 
-                # Perform similarity search for this PDF ID
                 results = table.search(
-                    vectors={"vectorIndex": [query_embedding]},
+                    vectors={vector_index_name: [query_embedding]},
+                    n=limit_per_pdf,
+                    filter=filter_list
+                )
+                
+                # Process results for this PDF
+                pdf_results = _process_search_results(results, pdf_id=pid)
+                processed_results.extend(pdf_results)
+
+            # Sort by distance and limit results
+            processed_results.sort(key=lambda x: x["distance"])
+            final_results = processed_results[:limit]
+
+        # CASE 2: Unified search mode
+        else:
+            # CASE 2a: Unified search with exactly one PDF ID
+            if pdf_ids_list and len(pdf_ids_list) == 1:
+                filter_list = [["=", "user_id", user_id], ["=", "pdf_id", pdf_ids_list[0]]]
+                print(f"Unified search with single PDF filter: {filter_list}")
+                
+                results = table.search(
+                    vectors={vector_index_name: [query_embedding]},
                     n=limit,
                     filter=filter_list
                 )
                 
-                # Process results for this PDF ID
-                if results and len(results) > 0 and results[0]:
-                    pdf_results = []
-                    for row in results[0]:
-                        pdf_results.append({
-                            "pdf_id": row["pdf_id"],
-                            "pdf_name": row["pdf_name"],
-                            "chunk_text": row["chunk_text"],
-                            "chunk_index": row.get("chunk_index", 0),  # Include chunk index if available
-                            "distance": row["__nn_distance"]
-                        })
+                final_results = _process_search_results(results)
+                
+            # CASE 2b: Unified search with multiple PDF IDs
+            elif pdf_ids_list and len(pdf_ids_list) > 1:
+                print(f"Unified search across multiple PDFs ({len(pdf_ids_list)})")
+                results_per_pdf = max(3, limit // len(pdf_ids_list))
+                all_results = []
+                
+                # Search each PDF individually to avoid filter structure issues
+                for pid in pdf_ids_list:
+                    filter_list = [["=", "user_id", user_id], ["=", "pdf_id", pid]]
+                    print(f"  Searching PDF {pid}...")
+                    
+                    results = table.search(
+                        vectors={vector_index_name: [query_embedding]},
+                        n=results_per_pdf,
+                        filter=filter_list
+                    )
+                    
+                    # Process results for this PDF
+                    pdf_results = _process_search_results(results, pdf_id=pid)
                     all_results.extend(pdf_results)
-            
-            # Sort combined results by distance (relevance)
-            all_results.sort(key=lambda x: x["distance"])
-            
-            # Limit the total number of results
-            all_results = all_results[:limit]
-            
-            return {"results": all_results}
-        
-        else:  # Unified search (default)
-            # Construct filter for all specified PDFs or all user PDFs
-            filter_list = [["=", "user_id", user_id]]
-            if pdf_id:
-                if isinstance(pdf_id, list) and len(pdf_id) > 1:
-                    pdf_filter = ["or"]
-                    for pid in pdf_id:
-                        pdf_filter.append(["=", "pdf_id", pid])
-                    filter_list.append(pdf_filter)
-                elif isinstance(pdf_id, list):
-                    filter_list.append(["=", "pdf_id", pdf_id[0]])
-                else:
-                    filter_list.append(["=", "pdf_id", pdf_id])
-            
-            print(f"Unified search with filter: {filter_list}")
-            
-            # Perform unified search
-            results = table.search(
-                vectors={"vectorIndex": [query_embedding]},
-                n=limit,
-                filter=filter_list
-            )
-            
-            # Process results
-            if results and len(results) > 0 and results[0]:
-                response = []
-                for row in results[0]:
-                    response.append({
-                        "pdf_id": row["pdf_id"],
-                        "pdf_name": row["pdf_name"],
-                        "chunk_text": row["chunk_text"],
-                        "chunk_index": row.get("chunk_index", 0),  # Include chunk index if available
-                        "distance": row["__nn_distance"]
-                    })
-                return {"results": response}
-            
-            return {"results": []}
-            
+                
+                # Sort combined results by distance
+                all_results.sort(key=lambda x: x["distance"])
+                final_results = all_results[:limit]
+                print(f"Combined {len(all_results)} results from multiple PDFs, returning top {len(final_results)}")
+                
+            # CASE 2c: Unified search across all PDFs
+            else:
+                filter_list = [["=", "user_id", user_id]]
+                print(f"Unified search across all user PDFs: {filter_list}")
+                
+                results = table.search(
+                    vectors={vector_index_name: [query_embedding]},
+                    n=limit,
+                    filter=filter_list
+                )
+                
+                final_results = _process_search_results(results)
+                print(f"Unified search yielded {len(final_results)} valid results.")
+
+        return {"results": final_results}
+
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Search error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error during search: {str(e)}")
+        traceback.print_exc()  # Print the full traceback for debugging
+        detail_msg = f"Search error: {str(e)}"
+        raise HTTPException(status_code=500, detail=detail_msg)
     
 @app.get("/api/py/list_pdf_names")
 def list_pdf_names(user_id: str):
@@ -455,25 +534,55 @@ def list_pdf_names(user_id: str):
         # Query all rows for the user
         results = table.query(filter=[["=", "user_id", user_id]])
         
+        # Add debug information
+        result_type = type(results).__name__
+        print(f"Query returned result of type: {result_type}")
+        if hasattr(results, 'shape'):
+            print(f"DataFrame shape: {results.shape}")
+        elif hasattr(results, '__len__'):
+            print(f"Result length: {len(results)}")
+        
         # Check if results exist and extract unique PDF names and IDs
-        if results is not None and results:
-            # Create a dictionary to track unique PDF IDs
-            unique_pdfs = {}
-            for row in results:
-                pdf_id = row["pdf_id"]
-                if pdf_id not in unique_pdfs:
-                    unique_pdfs[pdf_id] = {
-                        "pdf_id": pdf_id,
-                        "pdf_name": row["pdf_name"]
-                    }
-            
-            # Convert dictionary values to list
-            pdf_data = list(unique_pdfs.values())
-            return {"pdfs": pdf_data}
+        if results is not None:
+            # Handle DataFrame case - use .empty to check if DataFrame is empty
+            if hasattr(results, 'empty'):
+                if not results.empty:
+                    print(f"Processing DataFrame with {len(results)} rows")
+                    # Create a dictionary to track unique PDF IDs
+                    unique_pdfs = {}
+                    # Iterate through DataFrame rows
+                    for _, row in results.iterrows():
+                        pdf_id = row["pdf_id"]
+                        if pdf_id not in unique_pdfs:
+                            unique_pdfs[pdf_id] = {
+                                "pdf_id": pdf_id,
+                                "pdf_name": row["pdf_name"]
+                            }
+                    
+                    # Convert dictionary values to list
+                    pdf_data = list(unique_pdfs.values())
+                    return {"pdfs": pdf_data}
+            else:
+                # Handle list/dict case as before
+                if len(results) > 0:
+                    print(f"Processing list with {len(results)} items")
+                    unique_pdfs = {}
+                    for row in results:
+                        pdf_id = row["pdf_id"]
+                        if pdf_id not in unique_pdfs:
+                            unique_pdfs[pdf_id] = {
+                                "pdf_id": pdf_id,
+                                "pdf_name": row["pdf_name"]
+                            }
+                    
+                    pdf_data = list(unique_pdfs.values())
+                    return {"pdfs": pdf_data}
         
         return {"pdfs": []}
     except Exception as e:
         print(f"Error listing PDF names: {str(e)}")
+        # Print more detailed traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error listing PDF names: {str(e)}")
 
 @app.get("/api/py/get_chunks_by_pdf_ids")
@@ -487,46 +596,47 @@ def get_chunks_by_pdf_ids(
             print("No PDF IDs provided, returning empty result")
             return {"chunks": []}
         
-        # Construct a proper filter for the PDF IDs - KDB.AI expects each filter to be a list
-        if len(pdf_ids) == 1:
-            # If there's only one PDF ID, use a simple equality filter as a list
-            filter_list = [["=", "pdf_id", pdf_ids[0]]]
-        else:
-            # For multiple PDF IDs, use multiple equality filters with OR
-            or_filter = ["or"]
-            for pdf_id in pdf_ids:
-                or_filter.append(["=", "pdf_id", pdf_id])
-            filter_list = [or_filter]
+        all_chunks = []
+        # Process each PDF ID separately to avoid filter structure issues
+        for pdf_id in pdf_ids:
+            filter_list = [["=", "pdf_id", pdf_id]]
+            print(f"Querying chunks for PDF ID: {pdf_id}")
+            
+            # Query chunks for this PDF
+            results = table.query(
+                filter=filter_list,
+                limit=limit
+            )
+            
+            # Handle DataFrame results
+            if hasattr(results, 'empty') and not results.empty:
+                # Convert DataFrame rows to dictionaries
+                for index, row in results.iterrows():
+                    all_chunks.append({
+                        "id": int(row["id"]),
+                        "pdf_id": str(row["pdf_id"]),
+                        "pdf_name": str(row["pdf_name"]),
+                        "chunk_text": str(row["chunk_text"])
+                    })
+                print(f"Added {len(results)} chunks from PDF ID {pdf_id}")
+            elif not hasattr(results, 'empty') and results is not None and len(results) > 0:
+                # Handle list/dict results (fallback)
+                for row in results:
+                    all_chunks.append({
+                        "id": int(row["id"]),
+                        "pdf_id": str(row["pdf_id"]),
+                        "pdf_name": str(row["pdf_name"]),
+                        "chunk_text": str(row["chunk_text"])
+                    })
+                print(f"Added {len(results)} chunks from PDF ID {pdf_id}")
+            else:
+                print(f"No chunks found for PDF ID {pdf_id}")
         
-        print(f"Query filter: {filter_list}")
-        
-        # Query chunks
-        results = table.query(
-            filter=filter_list,
-            limit=limit
-        )
-        
-        print(f"Query returned {len(results) if results is not None else 0} results")
-        
-        # Check if results exist
-        if results is None or not results:
-            return {"chunks": []}
-        
-        # Convert results to a list of dictionaries
-        chunks = []
-        for row in results:
-            chunks.append({
-                "id": int(row["id"]),
-                "pdf_id": str(row["pdf_id"]),
-                "pdf_name": str(row["pdf_name"]),
-                "chunk_text": str(row["chunk_text"])
-            })
-        
-        return {"chunks": chunks}
+        print(f"Retrieved {len(all_chunks)} total chunks for {len(pdf_ids)} PDFs")
+        return {"chunks": all_chunks}
     except Exception as e:
         print(f"Error retrieving chunks: {str(e)}")
         # Include the traceback for better debugging
-        import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error retrieving chunks: {str(e)}")
 

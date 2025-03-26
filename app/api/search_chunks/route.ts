@@ -7,7 +7,6 @@ interface SearchResult {
   chunk_text: string;
   distance?: number;
   chunk_index?: number;
-  page_number?: number;
   // Add any other properties that might be in the result
 }
 
@@ -59,7 +58,6 @@ export async function GET(req: NextRequest) {
       pdf_name: result.pdf_name,
       chunk_text: result.chunk_text,
       chunk_index: result.chunk_index || 0,
-      page_number: result.page_number || 0,
       distance: result.distance
     }))
 

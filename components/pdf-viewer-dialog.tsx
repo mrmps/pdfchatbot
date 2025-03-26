@@ -46,7 +46,7 @@ export function PdfViewerDialog({ open, onOpenChange }: PdfViewerDialogProps) {
   const [chunksByPdfId, setChunksByPdfId] = useState<Record<string, Chunk[]>>({})
   const [searchQuery, setSearchQuery] = useState("")
   const [filteredPdfList, setFilteredPdfList] = useState<PdfItem[]>([])
-  const [formattedChunks, setFormattedChunks] = useState<{text: string, pageNumber?: number, index: number}[]>([])
+  const [formattedChunks, setFormattedChunks] = useState<{text: string, index: number}[]>([])
   const [copiedChunk, setCopiedChunk] = useState<number | null>(null)
   const [userId, setUserId] = useState<string>("")
   const [showMobileList, setShowMobileList] = useState(true)
@@ -175,21 +175,14 @@ export function PdfViewerDialog({ open, onOpenChange }: PdfViewerDialogProps) {
         // Sort chunks by ID to ensure proper order
         const sortedChunks = [...pdfChunks].sort((a, b) => a.id - b.id);
         
-        // Process chunks to extract page numbers and format content
+        // Process chunks to format content
         const processedChunks = sortedChunks.map((chunk: Chunk, index: number) => {
-          // Extract page number if available in the chunk text
-          const pageMatch = chunk.chunk_text.match(/--- Page (\d+) ---/);
-          const pageNumber = pageMatch ? parseInt(pageMatch[1]) : undefined;
-          
-          // Clean up the text by removing the page marker
+          // Clean up the text by removing any page marker
           let cleanText = chunk.chunk_text;
-          if (pageMatch) {
-            cleanText = cleanText.replace(/--- Page \d+ ---/, '').trim();
-          }
+          cleanText = cleanText.replace(/--- Page \d+ ---/, '').trim();
           
           return {
             text: cleanText,
-            pageNumber,
             index: index + 1
           };
         });
@@ -213,54 +206,57 @@ export function PdfViewerDialog({ open, onOpenChange }: PdfViewerDialogProps) {
 
   return (
     <Credenza open={open} onOpenChange={onOpenChange}>
-      <CredenzaContent className="p-0 gap-0 overflow-hidden bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 max-w-full sm:max-w-5xl">
-        <CredenzaHeader className="p-3 sm:p-4 md:p-6 border-b border-zinc-200 dark:border-zinc-800">
-          <CredenzaTitle className="text-lg sm:text-xl font-semibold text-zinc-900 dark:text-zinc-50">PDF Library</CredenzaTitle>
-          <CredenzaDescription className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5 sm:mt-1">
-            View and explore your uploaded PDF documents
+      <CredenzaContent className="p-0 gap-0 overflow-hidden border-border rounded-lg bg-background max-w-full sm:max-w-6xl">
+        <CredenzaHeader className="p-4 sm:p-5 border-b border-border/50">
+          <CredenzaTitle className="text-lg font-medium text-foreground">Document Library</CredenzaTitle>
+          <CredenzaDescription className="text-xs sm:text-sm text-muted-foreground mt-1.5">
+            Browse and explore your uploaded PDF documents
           </CredenzaDescription>
         </CredenzaHeader>
 
-        <div className="flex flex-col max-h-[50vh] sm:max-h-[60vh] md:max-h-[70vh] overflow-hidden">
+        {/* Main content area with fixed height and improved layout */}
+        <div className="h-[60vh] sm:h-[65vh] md:h-[70vh] flex flex-col md:flex-row">
           {isLoading && !selectedPdf ? (
-            <div className="w-full flex items-center justify-center h-full min-h-[200px] p-4">
-              <div className="flex flex-col items-center">
-                <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin text-primary mb-2" />
-                <span className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">Loading PDF library...</span>
+            <div className="w-full flex items-center justify-center h-full">
+              <div className="flex flex-col items-center gap-2">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                <span className="text-xs text-muted-foreground">Loading documents...</span>
               </div>
             </div>
           ) : (
             <>
-              {/* PDF list with search and select functionality */}
+              {/* PDF list with search - improved styling */}
               <div 
                 className={cn(
-                  "md:w-1/3 md:border-r border-zinc-200 dark:border-zinc-800 flex flex-col",
+                  "md:w-1/3 md:max-w-[320px] md:border-r border-border/50 flex flex-col",
                   "w-full h-full",
                   !showMobileList && "hidden md:flex" // Hide on mobile when viewing content
                 )}
               >
-                <div className="p-3 sm:p-4 border-b border-zinc-200 dark:border-zinc-800">
+                <div className="p-3 sm:p-4 border-b border-border/50 flex-shrink-0">
                   <div className="relative">
-                    <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 sm:h-4 sm:w-4 text-zinc-500 dark:text-zinc-400" />
+                    <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
                     <Input
                       type="text"
-                      placeholder="Search PDFs..."
-                      className="pl-8 sm:pl-9 text-sm bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 h-9 sm:h-10"
+                      placeholder="Search documents..."
+                      className="pl-8 sm:pl-9 text-sm h-9 bg-background border-input"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                     />
                   </div>
                 </div>
                 
-                <ScrollArea className="flex-1 max-h-[calc(50vh-100px)] sm:max-h-[calc(60vh-100px)] md:max-h-[calc(70vh-100px)]">
+                <div className="flex-grow overflow-y-auto">
                   <div className="p-1.5 sm:p-2">
                     {filteredPdfList.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-6 sm:py-8 px-4 text-center">
-                        <FileText className="h-8 w-8 sm:h-12 sm:w-12 text-zinc-300 dark:text-zinc-600 mb-2 sm:mb-3" />
+                        <div className="rounded-full bg-muted p-3.5 mb-3">
+                          <FileText className="h-5 w-5 text-muted-foreground" />
+                        </div>
                         {pdfList.length === 0 ? (
-                          <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">No PDFs uploaded yet</p>
+                          <p className="text-xs text-muted-foreground">No documents uploaded yet</p>
                         ) : (
-                          <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">No PDFs match your search</p>
+                          <p className="text-xs text-muted-foreground">No documents match your search</p>
                         )}
                       </div>
                     ) : (
@@ -268,26 +264,26 @@ export function PdfViewerDialog({ open, onOpenChange }: PdfViewerDialogProps) {
                         {filteredPdfList.map((pdf, index) => (
                           <li 
                             key={index} 
-                            className={`
-                              px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-md cursor-pointer flex items-center gap-1.5 sm:gap-2
-                              ${selectedPdf === pdf.pdf_id 
+                            className={cn(
+                              "px-2.5 py-2 rounded-md cursor-pointer flex items-center gap-1.5 transition-colors text-sm",
+                              selectedPdf === pdf.pdf_id 
                                 ? 'bg-primary/10 text-primary border border-primary/20' 
-                                : 'hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200'}
-                            `}
+                                : 'hover:bg-muted/70 text-foreground'
+                            )}
                             onClick={() => handleSelectPdf(pdf.pdf_id, pdf.pdf_name)}
                           >
-                            <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
-                            <span className="text-xs sm:text-sm font-medium truncate flex-1">{pdf.pdf_name}</span>
-                            <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-zinc-400 flex-shrink-0" />
+                            <FileText className="h-3.5 w-3.5 flex-shrink-0" />
+                            <span className="font-medium truncate flex-1">{pdf.pdf_name}</span>
+                            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
                           </li>
                         ))}
                       </ul>
                     )}
                   </div>
-                </ScrollArea>
+                </div>
               </div>
               
-              {/* PDF content view */}
+              {/* PDF content view - improved layout */}
               <div 
                 className={cn(
                   "md:flex-1 flex flex-col w-full h-full",
@@ -297,45 +293,40 @@ export function PdfViewerDialog({ open, onOpenChange }: PdfViewerDialogProps) {
                 {selectedPdf ? (
                   <>
                     {/* Mobile navigation header */}
-                    <div className="md:hidden flex items-center gap-2 p-3 border-b border-zinc-200 dark:border-zinc-800">
+                    <div className="md:hidden flex items-center gap-2 p-3 border-b border-border/50 flex-shrink-0">
                       <Button 
                         variant="ghost" 
                         size="sm" 
-                        className="h-8 px-2" 
+                        className="h-8 px-2 gap-1.5" 
                         onClick={toggleMobileView}
                       >
-                        <ChevronLeft className="h-4 w-4 mr-1" />
+                        <ChevronLeft className="h-4 w-4" />
                         <span>Back</span>
                       </Button>
                       <h3 className="text-sm font-medium truncate flex-1">{selectedPdfName}</h3>
                     </div>
                   
-                    {/* Chunks view */}
-                    <ScrollArea className="flex-1 max-h-[calc(50vh-80px)] sm:max-h-[calc(60vh-80px)] md:max-h-[calc(70vh-80px)]">
-                      <div className="p-3 sm:p-4">
+                    {/* Chunks view with optimized overflow handling */}
+                    <div className="flex-grow overflow-y-auto">
+                      <div className="p-4">
                         {isLoading ? (
                           <div className="w-full flex items-center justify-center py-8">
-                            <div className="flex flex-col items-center">
-                              <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin text-primary mb-2" />
-                              <span className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">Loading content...</span>
+                            <div className="flex flex-col items-center gap-2">
+                              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                              <span className="text-xs text-muted-foreground">Loading content...</span>
                             </div>
                           </div>
                         ) : (
                           <>
                             {formattedChunks.length > 0 ? (
-                              <div className="space-y-3 sm:space-y-4">
+                              <div className="space-y-3">
                                 {formattedChunks.map((chunk, idx) => (
-                                  <Card key={idx} className="border border-zinc-200 dark:border-zinc-800 shadow-sm">
-                                    <CardHeader className="p-2.5 sm:p-3 flex flex-row items-center justify-between space-y-0 pb-2 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
-                                      <div className="flex items-center gap-1.5 sm:gap-2">
-                                        <Badge variant="outline" className="h-5 text-[10px] sm:text-xs px-1.5 sm:px-2 rounded-sm bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200">
+                                  <Card key={idx} className="border border-border/80 overflow-hidden bg-card shadow-sm">
+                                    <CardHeader className="p-3 flex flex-row items-center justify-between border-b border-border/30 bg-muted/30 gap-2 space-y-0 pb-3">
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <Badge variant="outline" className="h-5 text-[10px] px-1.5 rounded-full bg-background/80 text-foreground border-border">
                                           Chunk {chunk.index}
                                         </Badge>
-                                        {chunk.pageNumber && (
-                                          <Badge variant="outline" className="h-5 text-[10px] sm:text-xs px-1.5 sm:px-2 rounded-sm bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200">
-                                            Page {chunk.pageNumber}
-                                          </Badge>
-                                        )}
                                       </div>
                                       
                                       <TooltipProvider>
@@ -344,13 +335,13 @@ export function PdfViewerDialog({ open, onOpenChange }: PdfViewerDialogProps) {
                                             <Button 
                                               variant="ghost" 
                                               size="sm" 
-                                              className="h-7 w-7 p-0"
+                                              className="h-7 w-7 p-0 rounded-full"
                                               onClick={() => handleCopyChunk(idx, chunk.text)}
                                             >
                                               {copiedChunk === idx ? (
-                                                <Check className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-500" />
+                                                <Check className="h-3.5 w-3.5 text-green-500" />
                                               ) : (
-                                                <Copy className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-zinc-500" />
+                                                <Copy className="h-3.5 w-3.5 text-muted-foreground" />
                                               )}
                                             </Button>
                                           </TooltipTrigger>
@@ -360,18 +351,18 @@ export function PdfViewerDialog({ open, onOpenChange }: PdfViewerDialogProps) {
                                         </Tooltip>
                                       </TooltipProvider>
                                     </CardHeader>
-                                    <CardContent className="p-2.5 sm:p-3.5 text-xs sm:text-sm text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap">
+                                    <CardContent className="p-3 text-sm text-card-foreground whitespace-pre-wrap">
                                       {chunk.text}
                                     </CardContent>
                                   </Card>
                                 ))}
                               </div>
                             ) : (
-                              <div className="flex flex-col items-center justify-center py-8 text-center">
-                                <div className="rounded-full bg-zinc-100 dark:bg-zinc-800 p-3 mb-4">
-                                  <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-zinc-400 dark:text-zinc-500" />
+                              <div className="flex flex-col items-center justify-center py-12 text-center">
+                                <div className="rounded-full bg-muted p-4 mb-4">
+                                  <FileText className="h-5 w-5 text-muted-foreground" />
                                 </div>
-                                <p className="text-zinc-500 dark:text-zinc-400 text-xs sm:text-sm max-w-md">
+                                <p className="text-sm text-muted-foreground max-w-md">
                                   {pdfContent}
                                 </p>
                               </div>
@@ -379,27 +370,27 @@ export function PdfViewerDialog({ open, onOpenChange }: PdfViewerDialogProps) {
                           </>
                         )}
                       </div>
-                    </ScrollArea>
+                    </div>
                   </>
                 ) : (
-                  <div className="flex-1 flex flex-col items-center justify-center p-4 min-h-[200px]">
-                    {/* Show on larger screens when no PDF is selected */}
+                  <div className="flex-1 flex flex-col items-center justify-center p-4">
+                    {/* Empty state on desktop */}
                     <div className="hidden md:flex flex-col items-center justify-center text-center max-w-md">
-                      <div className="rounded-full bg-zinc-100 dark:bg-zinc-800 p-4 mb-4">
-                        <FileText className="h-6 w-6 sm:h-8 sm:w-8 text-zinc-400 dark:text-zinc-500" />
+                      <div className="rounded-full bg-muted p-4 mb-4">
+                        <FileText className="h-6 w-6 text-muted-foreground" />
                       </div>
-                      <p className="text-zinc-500 dark:text-zinc-400 text-sm sm:text-base">
-                        Select a PDF from the list to view its content
+                      <p className="text-sm text-muted-foreground">
+                        Select a document from the list to view its content
                       </p>
                     </div>
                     
-                    {/* Show on mobile to allow switching to list view */}
+                    {/* Mobile document selection prompt */}
                     <div className="md:hidden flex flex-col items-center justify-center text-center">
-                      <div className="rounded-full bg-zinc-100 dark:bg-zinc-800 p-3 mb-3">
-                        <Menu className="h-5 w-5 text-zinc-400 dark:text-zinc-500" />
+                      <div className="rounded-full bg-muted p-3 mb-3">
+                        <Menu className="h-5 w-5 text-muted-foreground" />
                       </div>
-                      <p className="text-zinc-500 dark:text-zinc-400 text-xs mb-4">
-                        No PDF selected
+                      <p className="text-xs text-muted-foreground mb-4">
+                        No document selected
                       </p>
                       <Button
                         size="sm"
@@ -407,7 +398,7 @@ export function PdfViewerDialog({ open, onOpenChange }: PdfViewerDialogProps) {
                         onClick={toggleMobileView}
                         className="text-xs h-8"
                       >
-                        View PDF List
+                        Browse Documents
                       </Button>
                     </div>
                   </div>

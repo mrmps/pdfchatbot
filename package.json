@@ -32,13 +32,14 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "concurrently": "^9.0.1",
+    "cost-of-modules": "1.0.1",
     "eslint": "8.41.0",
     "eslint-config-next": "13.4.4",
     "fs": "0.0.1-security",
     "geist": "^1.3.1",
     "lucide-react": "^0.483.0",
     "marked": "^15.0.7",
-    "next": "^14.2.13",
+    "next": "^15.2.4",
     "path": "^0.12.7",
     "pdf-parse": "^1.1.1",
     "postcss": "^8.4.47",
@@ -52,5 +53,8 @@
     "typescript": "5.6.2",
     "vaul": "^1.1.2",
     "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@next/bundle-analyzer": "^15.2.4"
   }
 }

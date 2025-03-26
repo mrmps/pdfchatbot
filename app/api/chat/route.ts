@@ -140,7 +140,9 @@ export async function POST(req: Request) {
                 method: "GET",
                 headers: {
                   "Accept": "application/json",
-                }
+                },
+                // Add timeout to prevent indefinite hanging
+                signal: AbortSignal.timeout(15000) // 15 seconds timeout
               });
               
               if (!searchResponse.ok) {
@@ -149,11 +151,41 @@ export async function POST(req: Request) {
                 return `Error searching PDFs: ${searchResponse.statusText}. Please try again with a different query.`;
               }
               
-              const searchData = await searchResponse.json();
-              const results = searchData.results || [];
+              // Validate that the response is valid JSON
+              let searchData;
+              let responseText = "";
+              try {
+                // First get the raw text for debugging
+                responseText = await searchResponse.clone().text();
+                console.log("Raw search response:", responseText.substring(0, 200) + (responseText.length > 200 ? "..." : ""));
+                
+                // Then try to parse as JSON
+                searchData = await searchResponse.json();
+                console.log("Parsed search data:", JSON.stringify(searchData).substring(0, 200) + "...");
+              } catch (err) {
+                console.error("Failed to parse search response as JSON:", err);
+                console.error("Response text was:", responseText);
+                return "Error: The search response was not valid JSON. Please try again.";
+              }
+              
+              // Ensure searchData is an object and results exists and is an array
+              if (!searchData || typeof searchData !== 'object') {
+                console.error("Search response is not a valid object:", searchData);
+                return "Error: Received an invalid search response. Please try again.";
+              }
+              
+              const results = Array.isArray(searchData.results) ? searchData.results : [];
+              console.log(`Found ${results.length} search results`);
+              
+              // Debug logging for search results array
+              if (results.length > 0) {
+                console.log("First search result sample:", JSON.stringify(results[0]).substring(0, 200) + "...");
+              } else {
+                console.log("Search returned empty results array");
+              }
               
               if (results.length === 0) {
-                return "No relevant information found in the PDFs.";
+                return "No relevant information found in the PDFs. Try rephrasing your question or searching for different terms.";
               }
               
               // Get PDF names for display in the UI
@@ -169,27 +201,64 @@ export async function POST(req: Request) {
               // Group results by PDF for better organization
               const resultsByPdf: Record<string, any[]> = {};
               
-              results.forEach((result: any) => {
-                const pdfName = result.pdf_name;
+              // Process results safely
+              results.forEach((result: any, index: number) => {
+                // Skip invalid results
+                if (!result || typeof result !== 'object') {
+                  console.log(`Skipping invalid result at index ${index}:`, result);
+                  return;
+                }
+                
+                // Debug logging for first few results
+                if (index < 3) {
+                  console.log(`Result ${index} data:`, JSON.stringify(result).substring(0, 100) + "...");
+                }
+                
+                // Extract PDF name with fallback
+                const pdfName = result.pdf_name || "Unknown Document";
+                
                 if (!resultsByPdf[pdfName]) {
                   resultsByPdf[pdfName] = [];
                 }
-                resultsByPdf[pdfName].push(result);
+                
+                // Ensure all values are properly extracted with fallbacks
+                const safeResult = {
+                  ...result,
+                  pdf_id: result.pdf_id || "",
+                  pdf_name: pdfName,
+                  chunk_text: typeof result.chunk_text === 'string' ? result.chunk_text : 
+                             (result.chunk_text ? String(result.chunk_text) : "No text available"),
+                  distance: result.distance || 0
+                };
+                
+                resultsByPdf[pdfName].push(safeResult);
               });
               
               // Format the results with markdown for better readability
               // Each chunk is clearly separated and labeled with its source
               let formattedResults = "";
               
+              if (Object.keys(resultsByPdf).length === 0) {
+                console.error("No valid PDF sections found in the search results");
+                return "No useful information found in the PDFs. Please try a different question.";
+              }
+              
+              console.log(`Formatting results for ${Object.keys(resultsByPdf).length} PDFs`);
+              
+              // Sort each PDF's chunks by distance (ascending) for better relevance
               Object.entries(resultsByPdf).forEach(([pdfName, chunks]) => {
+                // Sort chunks by distance (most relevant first)
+                const sortedChunks = [...chunks].sort((a, b) => a.distance - b.distance);
+                
                 formattedResults += `## From: ${pdfName}\n\n`;
                 
-                chunks.forEach((chunk, index) => {
-                  const pageInfo = chunk.page_number ? ` (Page ${chunk.page_number})` : '';
-                  formattedResults += `### Chunk ${index + 1}${pageInfo}\n\n${chunk.chunk_text}\n\n---\n\n`;
+                sortedChunks.forEach((chunk, index) => {
+                  const chunkText = chunk.chunk_text || "No text available for this chunk";
+                  formattedResults += `### Chunk ${index + 1}\n\n${chunkText}\n\n---\n\n`;
                 });
               });
               
+              console.log("Successfully created formatted results");
               return formattedResults.trim();
             } catch (error) {
               console.error("Error in searchPdfs tool:", error);
