@@ -1,13 +1,11 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, Form, Request, Query
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form, Query
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import kdbai_client as kdbai
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 import pandas as pd
-import time
 from fastapi import FastAPI, UploadFile, File, HTTPException
 import pandas as pd
-import time
 from contextlib import asynccontextmanager
 import openai
 from dotenv import load_dotenv
