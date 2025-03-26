@@ -16,10 +16,25 @@ export async function POST(req: Request) {
     const userId = await getUserId();
     
     console.log("Received messages:", JSON.stringify(messages).substring(0, 100) + "...");
+    console.log("User ID:", userId);
+
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
+    console.log("NEXT_PUBLIC_API_URL:", baseUrl);
+    
+    // Create URL properly handling undefined baseUrl
+    const apiUrl = baseUrl ? `${baseUrl}/api/py/list_pdf_names` : '/api/py/list_pdf_names';
+
+    // Create URL with proper user_id parameter
+    const url = new URL(apiUrl, 'http://localhost');
+    url.searchParams.append('user_id', userId);
+    
+    console.log("Fetching PDFs from:", url.toString());
 
     // Fetch available PDFs using list_pdf_names endpoint
-    const pdfResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/list_pdf_names?user_id=${userId}`);
+    const pdfResponse = await fetch(url.toString());
     if (!pdfResponse.ok) {
+      const errorText = await pdfResponse.text();
+      console.error(`Failed to fetch PDF list: ${pdfResponse.status} ${pdfResponse.statusText}`, errorText);
       throw new Error(`Failed to fetch PDF list: ${pdfResponse.statusText}`);
     }
     const pdfData = await pdfResponse.json();
@@ -91,7 +106,14 @@ export async function POST(req: Request) {
             
             try {
               // Build the URL with query parameters
-              const url = new URL(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/search`);
+              const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
+              console.log("NEXT_PUBLIC_API_URL for search:", baseUrl);
+              
+              // Create URL properly handling undefined baseUrl
+              const apiUrl = baseUrl ? `${baseUrl}/api/py/search` : '/api/py/search';
+              
+              // Always provide a base URL for the URL constructor in Node.js environment
+              const url = new URL(apiUrl, 'http://localhost');
               url.searchParams.append("user_id", userId);
               url.searchParams.append("query", query);
               url.searchParams.append("search_mode", searchMode);
@@ -110,6 +132,8 @@ export async function POST(req: Request) {
               }
               
               url.searchParams.append("limit", "5");
+              
+              console.log("Search URL:", url.toString());
               
               // Call the FastAPI search endpoint with GET
               const searchResponse = await fetch(url.toString(), {
@@ -141,18 +165,7 @@ export async function POST(req: Request) {
                   pdfNames = pdfIdToName[pdfIds] || pdfIds;
                 }
               }
-              
-              // Add pdfNames to the tool invocation args for display in the UI
-              // This is done by modifying the tool invocation object directly
-              const toolInvocation = {
-                args: {
-                  query,
-                  pdfIds,
-                  pdfNames,
-                  searchMode
-                }
-              };
-              
+
               // Group results by PDF for better organization
               const resultsByPdf: Record<string, any[]> = {};
               

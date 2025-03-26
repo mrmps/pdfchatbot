@@ -51,12 +51,12 @@ async def lifespan(app: FastAPI):
     # Cleanup code (if any) goes here
 
 # Then initialize the app
-app = FastAPI(docs_url="/docs", openapi_url="/openapi.json", lifespan=lifespan)
+app = FastAPI(docs_url="/api/py/docs", openapi_url="/api/py/openapi.json", lifespan=lifespan)
 
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Your Next.js frontend URL
+    allow_origins=["http://localhost:3000", "https://pdfchatbot.vercel.app"],  # Your Next.js frontend URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -83,6 +83,11 @@ session = kdbai.Session(endpoint=KDBAI_ENDPOINT, api_key=KDBAI_API_KEY)
 database = session.database("default")
 table = None
 KDBAI_TABLE_NAME = "pdf_chunks"
+
+# Root endpoint to confirm API is working
+@app.get("/api/py")
+def read_root():
+    return {"status": "ok", "message": "PDF Chat API is running"}
 
 def get_embeddings(texts, model="text-embedding-3-small"):
     """Get embeddings for a list of texts using OpenAI API directly."""
@@ -116,7 +121,7 @@ def split_text_content(content: str, chunk_size: int = 2200, chunk_overlap: int 
     return text_splitter.split_text(content)
 
 # Endpoints
-@app.post("/create_table")
+@app.post("/api/py/create_table")
 def create_table():
     """Create the KDB.AI table (drops existing table if it exists)."""
     global table
@@ -145,7 +150,7 @@ def create_table():
     table = database.create_table(KDBAI_TABLE_NAME, schema=schema, indexes=indexes)
     return {"message": f"Table '{KDBAI_TABLE_NAME}' created successfully"}
 
-@app.post("/upload_pdf")
+@app.post("/api/py/upload_pdf")
 async def upload_pdf(files: list[UploadFile] = File(...), user_id: str = Form(...)):
     """Upload multiple PDF files, parse them using PyPDF2, and store chunks in KDB.AI."""
     results = []
@@ -278,7 +283,7 @@ async def upload_pdf(files: list[UploadFile] = File(...), user_id: str = Form(..
             "error": "Failed to process all PDFs"
         }
 
-@app.get("/search")
+@app.get("/api/py/search")
 async def search(user_id: str, query: str, pdf_id: list[str] = Query(None), search_mode: str = "unified", limit: int = 5):
     """
     Search across user's PDFs with flexible search modes.
@@ -379,7 +384,7 @@ async def search(user_id: str, query: str, pdf_id: list[str] = Query(None), sear
         print(f"Search error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error during search: {str(e)}")
     
-@app.get("/list_pdf_names")
+@app.get("/api/py/list_pdf_names")
 def list_pdf_names(user_id: str):
     """List all unique PDF names and IDs uploaded by a specific user."""
     try:
@@ -396,7 +401,7 @@ def list_pdf_names(user_id: str):
         print(f"Error listing PDF names: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error listing PDF names: {str(e)}")
 
-@app.get("/get_chunks_by_pdf_ids")
+@app.get("/api/py/get_chunks_by_pdf_ids")
 def get_chunks_by_pdf_ids(
     pdf_ids: list[str] = Query(None, description="List of PDF IDs to retrieve chunks for"),
     limit: int = 10000
