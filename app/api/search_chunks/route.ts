@@ -1,6 +1,17 @@
 import { NextResponse } from "next/server"
 import { getUserId } from "@/lib/user-id"
 
+// Define an interface for the search result
+interface SearchResult {
+  pdf_id: string;
+  pdf_name: string;
+  chunk_text: string;
+  distance?: number;
+  chunk_index?: number;
+  page_number?: number;
+  // Add any other properties that might be in the result
+}
+
 export async function GET(req: Request) {
   try {
     // Get query parameters from the URL
@@ -44,7 +55,7 @@ export async function GET(req: Request) {
     
     // Transform the results to match the expected format
     // Include additional metadata if available
-    const chunks = data.results.map(result => ({
+    const chunks = data.results.map((result: SearchResult) => ({
       pdf_id: result.pdf_id,
       pdf_name: result.pdf_name,
       chunk_text: result.chunk_text,

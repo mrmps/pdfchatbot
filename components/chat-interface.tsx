@@ -52,7 +52,7 @@ export function ChatInterface() {
           User ID: {userId}
         </div>
       )}
-      <div className="flex flex-col min-w-0 gap-6 flex-1 overflow-y-auto pt-4 pb-4">
+      <div className="flex flex-col min-w-0 gap-8 flex-1 overflow-y-auto pt-4 pb-4">
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full space-y-4">
             <div className="w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
