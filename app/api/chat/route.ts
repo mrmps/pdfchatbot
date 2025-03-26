@@ -26,10 +26,7 @@ export async function POST(req: Request) {
       : '/api/py/list_pdf_names';
 
 
-    const url = new URL(apiUrl.startsWith('http') 
-      ? apiUrl
-      : `http://localhost:8000${apiUrl}`
-    );
+    const url = new URL(apiUrl);
     
     url.searchParams.append('user_id', userIdToUse);
     
@@ -116,10 +113,7 @@ export async function POST(req: Request) {
                 : '/api/py/search';
               
               // Create URL - for server components, we need a proper absolute URL
-              const url = new URL(apiUrl.startsWith('http') 
-                ? apiUrl  // It's already an absolute URL
-                : `http://localhost:8000${apiUrl}`  // Add proper hostname
-              );
+              const url = new URL(apiUrl);
               
               url.searchParams.append("user_id", userIdToUse);
               url.searchParams.append("query", query);

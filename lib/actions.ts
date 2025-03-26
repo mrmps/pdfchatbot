@@ -2,6 +2,24 @@
 
 import { revalidatePath } from "next/cache"
 
+/**
+ * Helper function to construct API URLs that work in both development and production
+ * @param endpoint The API endpoint path without leading slash (e.g. "api/py/upload_pdf")
+ * @returns A proper URL string that works in both environments
+ */
+function getApiUrl(endpoint: string): string {
+  // Remove any leading slash from the endpoint
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
+  
+  // If NEXT_PUBLIC_API_URL is set, use it as the base
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return `${process.env.NEXT_PUBLIC_API_URL}/${cleanEndpoint}`;
+  }
+  
+  // In production, use relative URLs that work with Next.js rewrites
+  return `/${cleanEndpoint}`;
+}
+
 interface PdfItem {
   pdf_id: string;
   pdf_name: string;
@@ -11,10 +29,7 @@ export async function uploadPdf(formData: FormData, userId: string) {
   try {
     formData.append('user_id', userId);
 
-    // If NEXT_PUBLIC_API_URL is not set, use a relative URL
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL 
-      ? `${process.env.NEXT_PUBLIC_API_URL}/api/py/upload_pdf` 
-      : '/api/py/upload_pdf';
+    const apiUrl = getApiUrl('api/py/upload_pdf');
     
     console.log("Upload URL:", apiUrl);
     
@@ -42,13 +57,10 @@ export async function uploadPdf(formData: FormData, userId: string) {
 
 export async function listPdfNames(userId: string) {
   try {
-    // If NEXT_PUBLIC_API_URL is not set, use a relative URL
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL 
-      ? `${process.env.NEXT_PUBLIC_API_URL}/api/py/list_pdf_names` 
-      : '/api/py/list_pdf_names';
+    const apiUrl = getApiUrl('api/py/list_pdf_names');
     
-    // Construct URL - add origin only for client-side (window available)
-    const url = new URL(apiUrl)
+    // Construct URL with query parameters
+    const url = new URL(apiUrl);
     
     url.searchParams.append('user_id', userId);
     
@@ -77,13 +89,10 @@ export async function getChunksByPdfIds(pdfIds: string[]) {
       return { chunks: [] };
     }
 
-    // If NEXT_PUBLIC_API_URL is not set, use a relative URL
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL 
-      ? `${process.env.NEXT_PUBLIC_API_URL}/api/py/get_chunks_by_pdf_ids` 
-      : '/api/py/get_chunks_by_pdf_ids';
+    const apiUrl = getApiUrl('api/py/get_chunks_by_pdf_ids');
     
-    // Construct URL - add origin only for client-side (window available)
-    const url = new URL(apiUrl)
+    // Construct URL with query parameters
+    const url = new URL(apiUrl);
     
     // Add each PDF ID as a separate query parameter with the same name
     pdfIds.forEach(id => {
@@ -139,13 +148,10 @@ export async function getAllUserChunks(userId: string) {
 // Function to search for relevant chunks
 export async function searchChunks(query: string, userId: string, pdfIds?: string[]) {
   try {
-    // If NEXT_PUBLIC_API_URL is not set, use a relative URL
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL 
-      ? `${process.env.NEXT_PUBLIC_API_URL}/api/py/search` 
-      : '/api/py/search';
+    const apiUrl = getApiUrl('api/py/search');
 
-    // Construct URL - add origin only for client-side (window available)
-    const url = new URL(apiUrl)
+    // Construct URL with query parameters
+    const url = new URL(apiUrl);
     
     url.searchParams.append('user_id', userId);
     url.searchParams.append('query', query);
