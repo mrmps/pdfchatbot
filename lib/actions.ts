@@ -13,11 +13,11 @@ export async function uploadPdf(formData: FormData) {
     const userId = await getUserId();
     formData.append('user_id', userId);
 
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
-    console.log("NEXT_PUBLIC_API_URL:", baseUrl);
-
-    // Create URL properly handling undefined baseUrl
-    const apiUrl = baseUrl ? `${baseUrl}/api/py/upload_pdf` : '/api/py/upload_pdf';
+    // If NEXT_PUBLIC_API_URL is not set, use a relative URL
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL 
+      ? `${process.env.NEXT_PUBLIC_API_URL}/api/py/upload_pdf` 
+      : '/api/py/upload_pdf';
+    
     console.log("Upload URL:", apiUrl);
     
     const response = await fetch(apiUrl, {
@@ -46,14 +46,14 @@ export async function listPdfNames() {
   try {
     const userId = await getUserId();
 
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
-    console.log("NEXT_PUBLIC_API_URL:", baseUrl);
+    // If NEXT_PUBLIC_API_URL is not set, use a relative URL
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL 
+      ? `${process.env.NEXT_PUBLIC_API_URL}/api/py/list_pdf_names` 
+      : '/api/py/list_pdf_names';
     
-    // Create URL properly handling undefined baseUrl
-    const apiUrl = baseUrl ? `${baseUrl}/api/py/list_pdf_names` : '/api/py/list_pdf_names';
+    // Construct URL - add origin only for client-side (window available)
+    const url = new URL(apiUrl)
     
-    // Always provide an origin for the URL constructor
-    const url = new URL(apiUrl, window.location.origin);
     url.searchParams.append('user_id', userId);
     
     console.log("List PDFs URL:", url.toString());
@@ -81,12 +81,13 @@ export async function getChunksByPdfIds(pdfIds: string[]) {
       return { chunks: [] };
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
-    // Create URL properly handling undefined baseUrl
-    const apiUrl = baseUrl ? `${baseUrl}/api/py/get_chunks_by_pdf_ids` : '/api/py/get_chunks_by_pdf_ids';
+    // If NEXT_PUBLIC_API_URL is not set, use a relative URL
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL 
+      ? `${process.env.NEXT_PUBLIC_API_URL}/api/py/get_chunks_by_pdf_ids` 
+      : '/api/py/get_chunks_by_pdf_ids';
     
-    // Always provide an origin for the URL constructor
-    const url = new URL(apiUrl, window.location.origin);
+    // Construct URL - add origin only for client-side (window available)
+    const url = new URL(apiUrl)
     
     // Add each PDF ID as a separate query parameter with the same name
     pdfIds.forEach(id => {
@@ -144,12 +145,14 @@ export async function searchChunks(query: string, pdfIds?: string[]) {
   try {
     const userId = await getUserId();
     
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
-    // Create URL properly handling undefined baseUrl
-    const apiUrl = baseUrl ? `${baseUrl}/api/py/search` : '/api/py/search';
+    // If NEXT_PUBLIC_API_URL is not set, use a relative URL
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL 
+      ? `${process.env.NEXT_PUBLIC_API_URL}/api/py/search` 
+      : '/api/py/search';
 
-    // Always provide an origin for the URL constructor
-    const url = new URL(apiUrl, window.location.origin);
+    // Construct URL - add origin only for client-side (window available)
+    const url = new URL(apiUrl)
+    
     url.searchParams.append('user_id', userId);
     url.searchParams.append('query', query);
     

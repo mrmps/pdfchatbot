@@ -84,11 +84,6 @@ database = session.database("default")
 table = None
 KDBAI_TABLE_NAME = "pdf_chunks"
 
-# Root endpoint to confirm API is working
-@app.get("/api/py")
-def read_root():
-    return {"status": "ok", "message": "PDF Chat API is running"}
-
 def get_embeddings(texts, model="text-embedding-3-small"):
     """Get embeddings for a list of texts using OpenAI API directly."""
     if not texts:

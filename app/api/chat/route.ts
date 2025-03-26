@@ -18,14 +18,18 @@ export async function POST(req: Request) {
     console.log("Received messages:", JSON.stringify(messages).substring(0, 100) + "...");
     console.log("User ID:", userId);
 
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
-    console.log("NEXT_PUBLIC_API_URL:", baseUrl);
-    
-    // Create URL properly handling undefined baseUrl
-    const apiUrl = baseUrl ? `${baseUrl}/api/py/list_pdf_names` : '/api/py/list_pdf_names';
+    // If NEXT_PUBLIC_API_URL is not set, use a relative URL
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL 
+      ? `${process.env.NEXT_PUBLIC_API_URL}/api/py/list_pdf_names` 
+      : '/api/py/list_pdf_names';
 
-    // Create URL with proper user_id parameter
-    const url = new URL(apiUrl, 'http://localhost');
+    // Create URL - for server components, we need a proper absolute URL
+    // Correct way to create URL to avoid issues like "localhosthttp/..."
+    const url = new URL(apiUrl.startsWith('http') 
+      ? apiUrl  // It's already an absolute URL
+      : `http://localhost:8000${apiUrl}`  // Add proper hostname
+    );
+    
     url.searchParams.append('user_id', userId);
     
     console.log("Fetching PDFs from:", url.toString());
@@ -105,15 +109,17 @@ export async function POST(req: Request) {
             console.log(`Searching PDFs with query: "${query}"${pdfIds ? ` in PDF IDs: ${JSON.stringify(pdfIds)}` : ''}, mode: ${searchMode}`);
             
             try {
-              // Build the URL with query parameters
-              const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
-              console.log("NEXT_PUBLIC_API_URL for search:", baseUrl);
+              // If NEXT_PUBLIC_API_URL is not set, use a relative URL
+              const apiUrl = process.env.NEXT_PUBLIC_API_URL 
+                ? `${process.env.NEXT_PUBLIC_API_URL}/api/py/search` 
+                : '/api/py/search';
               
-              // Create URL properly handling undefined baseUrl
-              const apiUrl = baseUrl ? `${baseUrl}/api/py/search` : '/api/py/search';
+              // Create URL - for server components, we need a proper absolute URL
+              const url = new URL(apiUrl.startsWith('http') 
+                ? apiUrl  // It's already an absolute URL
+                : `http://localhost:8000${apiUrl}`  // Add proper hostname
+              );
               
-              // Always provide a base URL for the URL constructor in Node.js environment
-              const url = new URL(apiUrl, 'http://localhost');
               url.searchParams.append("user_id", userId);
               url.searchParams.append("query", query);
               url.searchParams.append("search_mode", searchMode);
