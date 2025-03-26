@@ -1,2 +1,9 @@
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
+python-multipart==0.0.9
+langchain>=0.1.9
+PyPDF2>=3.0.0
+pydantic>=2.5.2
+python-dotenv>=1.0.1
+numpy>=1.26.4
+sentence-transformers>=2.6.0

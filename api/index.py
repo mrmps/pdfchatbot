@@ -56,7 +56,7 @@ app = FastAPI(docs_url="/api/py/docs", openapi_url="/api/py/openapi.json", lifes
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://pdfchatbot.vercel.app"],  # Your Next.js frontend URL
+    allow_origins=["http://localhost:3000", "https://chatpdfkdbai.vercel.app/"],  # Your Next.js frontend URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
