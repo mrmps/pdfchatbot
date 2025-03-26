@@ -4,7 +4,7 @@ import { useState } from "react"
 import { FileUpload } from "@/components/file-upload"
 import { Chat } from "@/components/chat-interface"
 import { Button } from "@/components/ui/button"
-import { Upload, FileText } from "lucide-react"
+import { Upload, FileText, Github } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { PdfViewerDialog } from "@/components/pdf-viewer-dialog"
@@ -32,6 +32,15 @@ export default function Home() {
           <Button variant="outline" className="flex items-center gap-2" onClick={() => setViewingContent(true)}>
             <FileText className="h-4 w-4" />
             View PDF Content
+          </Button>
+
+          <Button 
+            variant="default" 
+            className="flex items-center gap-2 bg-black hover:bg-gray-800 text-white" 
+            onClick={() => window.open("https://github.com/mrmps/pdfchatbot", "_blank")}
+          >
+            <Github className="h-5 w-5" />
+            Star on GitHub
           </Button>
         </div>
       </header>
