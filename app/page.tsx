@@ -8,6 +8,7 @@ import { Upload, FileText, Github } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { PdfViewerDialog } from "@/components/pdf-viewer-dialog"
+import Image from "next/image"
 
 export default function Home() {
   const [viewingContent, setViewingContent] = useState(false)
@@ -18,7 +19,7 @@ export default function Home() {
       {/* Header with buttons */}
       <header className="border-b p-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <img src="/kdbai.png" alt="KDB AI Logo" width={100} height={100} />
+          <Image src="/kdbai.png" alt="KDB AI Logo" width={100} height={100} />
           <Badge variant="secondary" className="px-3 py-1 text-sm font-medium">
             PDF Chat
           </Badge>

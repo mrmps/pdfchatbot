@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server"
-import { getUserId } from "@/lib/user-id"
 
 // Define an interface for the search result
 interface SearchResult {
@@ -19,9 +18,7 @@ export async function GET(req: Request) {
     const query = url.searchParams.get('query')
     const pdf_id = url.searchParams.get('pdf_id')
     const limit = parseInt(url.searchParams.get('limit') || '5')
-    
-    // Get the user ID from fingerprinting
-    const user_id = await getUserId()
+    const user_id = url.searchParams.get('user_id') || 'anonymous-user'
     
     if (!query) {
       return NextResponse.json(

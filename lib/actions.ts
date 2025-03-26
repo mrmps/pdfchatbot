@@ -3,14 +3,6 @@
 import { revalidatePath } from "next/cache"
 import { getUserId } from './user-id'
 
-// Define interfaces for our data structures
-interface Chunk {
-  id: number;
-  pdf_id: string;
-  pdf_name: string;
-  chunk_text: string;
-}
-
 interface PdfItem {
   pdf_id: string;
   pdf_name: string;
