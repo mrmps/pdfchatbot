@@ -2,7 +2,6 @@ from fastapi import FastAPI,HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import kdbai_client as kdbai
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 import pandas as pd
 from fastapi import FastAPI, HTTPException
 import pandas as pd
@@ -128,15 +127,6 @@ def batch_embed_texts(texts, batch_size=100, model="text-embedding-3-small"):
                     all_embeddings.append([0.0] * 1536)
     
     return all_embeddings
-
-def split_text_content(content: str, chunk_size: int = 2200, chunk_overlap: int = 200) -> list[str]:
-    """Split text into chunks using RecursiveCharacterTextSplitter."""
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=chunk_size,
-        chunk_overlap=chunk_overlap,
-        separators=["\n\n", "\n", " "]
-    )
-    return text_splitter.split_text(content)
 
 # Endpoints
 @app.post("/api/py/create_table")
