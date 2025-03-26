@@ -26,14 +26,28 @@ export async function uploadPdf(formData: FormData, userId: string) {
     
     console.log("Upload URL:", apiUrl);
     
+    // Increased timeout for large files (10 minutes)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 600000);
+    
     const response = await fetch(apiUrl, {
       method: 'POST',
       body: formData,
+      signal: controller.signal,
     });
     
+    clearTimeout(timeoutId); // Clear the timeout if the request completes
+    
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to upload PDF');
+      let errorMessage = 'Failed to upload PDF';
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.error || errorMessage;
+      } catch (e) {
+        // If we can't parse JSON, use the status text
+        errorMessage = `${response.status}: ${response.statusText}`;
+      }
+      throw new Error(errorMessage);
     }
     
     const data = await response.json();
@@ -41,9 +55,17 @@ export async function uploadPdf(formData: FormData, userId: string) {
     // Revalidate the path to update the UI
     revalidatePath("/")
 
-    return { success: true, ...data };
+    return { 
+      success: true, 
+      ...data,
+      // Ensure processing_time is properly passed along
+      processing_time: data.processing_time || null
+    };
   } catch (error) {
     console.error('Error uploading PDF:', error);
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      return { success: false, error: 'Request timed out. The server took too long to respond.' };
+    }
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 }

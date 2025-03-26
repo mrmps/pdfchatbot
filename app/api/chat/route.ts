@@ -88,6 +88,8 @@ export async function POST(req: Request) {
       
       When you receive search results, pay careful attention to which PDF each chunk comes from.
       Each chunk will be clearly labeled with its source PDF name.
+
+      You should almost always use the searchPdfs tool.
       
       Format your responses using Markdown for better readability.`,
       tools: {
@@ -129,7 +131,7 @@ export async function POST(req: Request) {
                 }
               }
               
-              url.searchParams.append("limit", "5");
+              url.searchParams.append("limit", "20");
               
               console.log("Search URL:", url.toString());
               

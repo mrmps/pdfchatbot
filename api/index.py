@@ -1,18 +1,18 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, Form, Query
+from fastapi import FastAPI,HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import kdbai_client as kdbai
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 import pandas as pd
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, HTTPException
 import pandas as pd
 from contextlib import asynccontextmanager
 import openai
 from dotenv import load_dotenv
 import os
-import tempfile
 import uuid
-import PyPDF2  # Using PyPDF2 instead of PyMuPDF
+import json
+import time
 
 # Load environment variables from .env file
 load_dotenv()
@@ -104,6 +104,31 @@ def embed_single_text(text, model="text-embedding-3-small"):
     )
     return response.data[0].embedding
 
+def batch_embed_texts(texts, batch_size=100, model="text-embedding-3-small"):
+    """Process a large list of texts in batches for more efficient embedding."""
+    all_embeddings = []
+    
+    # Process in batches
+    for i in range(0, len(texts), batch_size):
+        batch = texts[i:min(i + batch_size, len(texts))]
+        try:
+            batch_embeddings = get_embeddings(batch, model)
+            all_embeddings.extend(batch_embeddings)
+            print(f"Embedded batch {i//batch_size + 1}/{(len(texts) + batch_size - 1)//batch_size} ({len(batch)} chunks)")
+        except Exception as e:
+            print(f"Error embedding batch {i//batch_size + 1}: {str(e)}")
+            # If batch fails, try one by one as fallback
+            for text in batch:
+                try:
+                    embedding = embed_single_text(text, model)
+                    all_embeddings.append(embedding)
+                except Exception as e:
+                    print(f"Error embedding text: {str(e)}")
+                    # Add a zero vector as placeholder to maintain alignment
+                    all_embeddings.append([0.0] * 1536)
+    
+    return all_embeddings
+
 def split_text_content(content: str, chunk_size: int = 2200, chunk_overlap: int = 200) -> list[str]:
     """Split text into chunks using RecursiveCharacterTextSplitter."""
     text_splitter = RecursiveCharacterTextSplitter(
@@ -144,140 +169,201 @@ def create_table():
     return {"message": f"Table '{KDBAI_TABLE_NAME}' created successfully"}
 
 @app.post("/api/py/upload_pdf")
-async def upload_pdf(files: list[UploadFile] = File(...), user_id: str = Form(...)):
-    """Upload multiple PDF files, parse them using PyPDF2, and store chunks in KDB.AI."""
-    results = []
-    
-    for file in files:
+async def upload_pdf(request: Request):
+    """Upload pre-parsed PDF chunks from the frontend and store them in KDB.AI."""
+    try:
+        # Parse the form data
         try:
-            # Create a temporary file to save the uploaded PDF
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
-                temp_file_path = temp_file.name
-                # Write the uploaded file content to the temporary file
-                content = await file.read()
-                temp_file.write(content)
+            form_data = await request.form()
+            user_id = form_data.get('userId')
+            parsed_data_str = form_data.get('parsedData')
             
-            print(f"Processing file: {file.filename}")
+            if not user_id:
+                user_id = form_data.get('user_id')  # Fallback to alternative name
+                
+            if not user_id:
+                raise HTTPException(status_code=422, detail="Missing required parameter: userId")
+            
+            if not parsed_data_str:
+                raise HTTPException(status_code=422, detail="Missing required parameter: parsedData")
+        except Exception as e:
+            print(f"Error parsing form data: {str(e)}")
+            raise HTTPException(status_code=400, detail=f"Invalid form data: {str(e)}")
+        
+        # Parse the JSON string with parsed data
+        try:
+            parsed_data = json.loads(parsed_data_str)
+            documents = parsed_data.get('documents', [])
+        except json.JSONDecodeError as e:
+            print(f"JSON decode error: {str(e)}")
+            raise HTTPException(status_code=400, detail=f"Invalid JSON in parsedData: {str(e)}")
+        
+        if not documents:
+            raise HTTPException(status_code=400, detail="No document chunks provided")
+        
+        results = []
+        
+        # Get the next available ID
+        try:
+            max_id_query = "select max(id) as max_id from pdf_chunks"
+            max_id_result = table.query(max_id_query)
+            next_id = 1
+            if max_id_result is not None and not max_id_result.empty and not pd.isna(max_id_result["max_id"].iloc[0]):
+                next_id = int(max_id_result["max_id"].iloc[0]) + 1
+            print(f"Starting with ID: {next_id}")
+        except Exception as e:
+            print(f"Error getting max ID: {str(e)}")
+            next_id = 1
+        
+        # Collect all chunks from all documents first
+        all_texts = []
+        document_info = []
+        chunk_counter = 0
+        
+        # First pass: collect all valid chunks and document info
+        for doc_index, document in enumerate(documents):
+            filename = document.get('filename', f"document_{doc_index}")
+            chunks = document.get('chunks', [])
+            
+            if not chunks:
+                results.append({
+                    "success": False,
+                    "pdf_name": filename,
+                    "error": "No chunks provided"
+                })
+                continue
             
             # Generate a unique ID for this PDF
             pdf_id = str(uuid.uuid4())
             
-            try:
-                # Parse the PDF using PyPDF2
-                text_content = ""
-                page_texts = []
-                
-                # Open the PDF with PyPDF2
-                with open(temp_file_path, 'rb') as pdf_file:
-                    pdf_reader = PyPDF2.PdfReader(pdf_file)
-                    
-                    # Extract text from each page
-                    for page_num in range(len(pdf_reader.pages)):
-                        page = pdf_reader.pages[page_num]
-                        page_text = page.extract_text()
-                        if page_text and page_text.strip():
-                            page_texts.append((page_num + 1, page_text))
-                            text_content += f"--- Page {page_num + 1} ---\n{page_text}\n\n"
-                
-                # If text content is empty, raise an exception
-                if not text_content.strip():
-                    raise ValueError("No text content could be extracted from the PDF")
-                
-                # Get the next available ID
-                try:
-                    max_id_result = table.query("select max(id) as max_id from pdf_chunks")
-                    next_id = 1
-                    if max_id_result is not None and not max_id_result.empty and not pd.isna(max_id_result["max_id"].iloc[0]):
-                        next_id = int(max_id_result["max_id"].iloc[0]) + 1
-                except Exception as e:
-                    print(f"Error getting max ID: {str(e)}")
-                    next_id = 1
-                
-                # Process each page and create chunks
-                data_list = []
-                chunk_id = 0
-                
-                for page_num, page_text in page_texts:
-                    # Split the page text into chunks
-                    page_chunks = split_text_content(page_text)
-                    
-                    # Process each chunk
-                    for chunk in page_chunks:
-                        if chunk.strip():  # Skip empty chunks
-                            # Get embedding for this chunk
-                            chunk_embedding = embed_single_text(chunk)
-                            
-                            # Add to data list
-                            data_list.append({
-                                "id": next_id + chunk_id,
-                                "user_id": user_id,
-                                "pdf_id": pdf_id,
-                                "pdf_name": file.filename,
-                                "chunk_text": chunk,
-                                "embeddings": chunk_embedding
-                            })
-                            chunk_id += 1
-                
-                # Create a DataFrame for batch insertion
-                if data_list:
-                    data = pd.DataFrame(data_list)
-                    # Insert the data into KDB.AI
-                    table.insert(data)
-                    print(f"Inserted {len(data_list)} chunks for {file.filename}")
-                    
-                    results.append({
-                        "success": True,
-                        "pdf_id": pdf_id,
-                        "pdf_name": file.filename,
-                        "chunks": len(data_list)
-                    })
-                else:
-                    # Handle case where no chunks were created
-                    results.append({
-                        "success": False,
-                        "pdf_name": file.filename,
-                        "error": "No valid text chunks could be extracted from the PDF"
-                    })
-                
-            except Exception as e:
-                print(f"Error while parsing the file '{temp_file_path}': {str(e)}")
-                # Return a more informative error message
+            valid_chunks = []
+            for chunk_text in chunks:
+                if chunk_text and chunk_text.strip():  # Skip empty chunks
+                    all_texts.append(chunk_text)
+                    valid_chunks.append(chunk_text)
+            
+            # Store document info for later reference
+            document_info.append({
+                "pdf_id": pdf_id,
+                "pdf_name": filename,
+                "chunks": valid_chunks,
+                "start_index": chunk_counter
+            })
+            
+            chunk_counter += len(valid_chunks)
+            
+            if valid_chunks:
+                print(f"Collected {len(valid_chunks)} valid chunks from {filename}")
+            else:
                 results.append({
                     "success": False,
-                    "pdf_name": file.filename,
-                    "error": f"Failed to process PDF: {str(e)}"
+                    "pdf_name": filename,
+                    "error": "No valid text chunks could be extracted"
                 })
-                
-            finally:
-                # Clean up the temporary file
-                try:
-                    os.unlink(temp_file_path)
-                except Exception as e:
-                    print(f"Error removing temporary file: {str(e)}")
-                    
-        except Exception as e:
-            print(f"Upload error for {file.filename}: {str(e)}")
-            results.append({
+        
+        total_chunks = len(all_texts)
+        if total_chunks == 0:
+            return {
                 "success": False,
-                "pdf_name": file.filename,
-                "error": f"Error uploading PDF: {str(e)}"
+                "error": "No valid chunks found in any document"
+            }
+        
+        print(f"Beginning batch embedding of {total_chunks} total chunks")
+        
+        # Second pass: batch embed all texts
+        start_time = time.time()
+        all_embeddings = batch_embed_texts(all_texts, batch_size=100)
+        embedding_time = time.time() - start_time
+        print(f"Embedding completed in {embedding_time:.2f} seconds ({total_chunks / embedding_time:.2f} chunks/sec)")
+        
+        # Third pass: create data frames and insert into database
+        all_data_rows = []
+        insertion_time = 0  # Define with default value to avoid reference errors
+        
+        for doc in document_info:
+            pdf_id = doc["pdf_id"]
+            filename = doc["pdf_name"]
+            chunks = doc["chunks"]
+            start_index = doc["start_index"]
+            
+            if not chunks:
+                continue
+                
+            # Prepare all rows for this document
+            for i, chunk_text in enumerate(chunks):
+                embedding_index = start_index + i
+                if embedding_index < len(all_embeddings):
+                    embedding = all_embeddings[embedding_index]
+                    all_data_rows.append({
+                        "id": next_id + embedding_index,
+                        "user_id": user_id,
+                        "pdf_id": pdf_id,
+                        "pdf_name": filename,
+                        "chunk_text": chunk_text,
+                        "embeddings": embedding
+                    })
+            
+            # Add success result
+            results.append({
+                "success": True,
+                "pdf_id": pdf_id,
+                "pdf_name": filename,
+                "chunks": len(chunks)
             })
-    
-    # Check if any files were processed successfully
-    if any(result["success"] for result in results):
-        return {
-            "success": True,
-            "results": results
-        }
-    else:
-        return {
-            "success": False,
-            "results": results,
-            "error": "Failed to process all PDFs"
-        }
+        
+        # Create a single DataFrame with all data
+        if all_data_rows:
+            print(f"Preparing to insert {len(all_data_rows)} rows into database")
+            all_data_df = pd.DataFrame(all_data_rows)
+            
+            # Use larger batch size for more efficient inserts
+            batch_size = 1000
+            
+            # Insert in batches
+            start_time = time.time()
+            for i in range(0, len(all_data_rows), batch_size):
+                batch = all_data_df.iloc[i:i+batch_size]
+                table.insert(batch)
+                print(f"Inserted batch {i//batch_size + 1}/{(len(all_data_rows) + batch_size - 1)//batch_size}, rows {i} to {min(i+batch_size-1, len(all_data_rows)-1)}")
+            
+            insertion_time = time.time() - start_time
+            print(f"Database insertion completed in {insertion_time:.2f} seconds ({len(all_data_rows) / insertion_time:.2f} rows/sec)")
+        
+        print(f"Total chunks inserted: {len(all_data_rows)}")
+        
+        # Check if any files were processed successfully
+        if any(result["success"] for result in results):
+            return {
+                "success": True,
+                "results": results,
+                "total_chunks": len(all_data_rows),
+                "processing_time": {
+                    "embedding_seconds": round(embedding_time, 2),
+                    "insertion_seconds": round(insertion_time, 2)
+                }
+            }
+        else:
+            raise HTTPException(
+                status_code=500, 
+                detail={
+                    "success": False,
+                    "results": results,
+                    "error": "Failed to process all PDFs"
+                }
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Upload error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Error processing PDFs: {str(e)}"
+        )
 
 @app.get("/api/py/search")
-async def search(user_id: str, query: str, pdf_id: list[str] = Query(None), search_mode: str = "unified", limit: int = 5):
+async def search(user_id: str, query: str, pdf_id: list[str] = Query(None), search_mode: str = "unified", limit: int = 20):
     """
     Search across user's PDFs with flexible search modes.
     
