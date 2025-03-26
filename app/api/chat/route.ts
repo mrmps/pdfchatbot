@@ -1,36 +1,37 @@
 import { openai } from '@ai-sdk/openai';
 import { streamText, tool } from 'ai';
 import { z } from 'zod';
-import { getUserId } from '@/lib/user-id';
 
-// Allow streaming responses up to 30 seconds
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 export async function POST(req: Request) {
   try {
     console.log("Chat API route called");
     const body = await req.json();
-    const { messages, pdfIds } = body;
+    const { messages, pdfIds, userId } = body;
     
-    // Get the user ID from fingerprinting
-    const userId = await getUserId();
+    // Require userId from the frontend
+    if (!userId) {
+      throw new Error("No user ID provided. User authentication is required.");
+    }
+    
+    const userIdToUse = userId;
+    console.log("Using user ID from frontend:", userIdToUse);
     
     console.log("Received messages:", JSON.stringify(messages).substring(0, 100) + "...");
-    console.log("User ID:", userId);
 
     // If NEXT_PUBLIC_API_URL is not set, use a relative URL
     const apiUrl = process.env.NEXT_PUBLIC_API_URL 
       ? `${process.env.NEXT_PUBLIC_API_URL}/api/py/list_pdf_names` 
       : '/api/py/list_pdf_names';
 
-    // Create URL - for server components, we need a proper absolute URL
-    // Correct way to create URL to avoid issues like "localhosthttp/..."
+
     const url = new URL(apiUrl.startsWith('http') 
-      ? apiUrl  // It's already an absolute URL
-      : `http://localhost:8000${apiUrl}`  // Add proper hostname
+      ? apiUrl
+      : `http://localhost:8000${apiUrl}`
     );
     
-    url.searchParams.append('user_id', userId);
+    url.searchParams.append('user_id', userIdToUse);
     
     console.log("Fetching PDFs from:", url.toString());
 
@@ -120,7 +121,7 @@ export async function POST(req: Request) {
                 : `http://localhost:8000${apiUrl}`  // Add proper hostname
               );
               
-              url.searchParams.append("user_id", userId);
+              url.searchParams.append("user_id", userIdToUse);
               url.searchParams.append("query", query);
               url.searchParams.append("search_mode", searchMode);
               
@@ -222,4 +223,3 @@ export async function POST(req: Request) {
     );
   }
 }
-

@@ -1,16 +1,14 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { getUserId } from './user-id'
 
 interface PdfItem {
   pdf_id: string;
   pdf_name: string;
 }
 
-export async function uploadPdf(formData: FormData) {
+export async function uploadPdf(formData: FormData, userId: string) {
   try {
-    const userId = await getUserId();
     formData.append('user_id', userId);
 
     // If NEXT_PUBLIC_API_URL is not set, use a relative URL
@@ -42,10 +40,8 @@ export async function uploadPdf(formData: FormData) {
   }
 }
 
-export async function listPdfNames() {
+export async function listPdfNames(userId: string) {
   try {
-    const userId = await getUserId();
-
     // If NEXT_PUBLIC_API_URL is not set, use a relative URL
     const apiUrl = process.env.NEXT_PUBLIC_API_URL 
       ? `${process.env.NEXT_PUBLIC_API_URL}/api/py/list_pdf_names` 
@@ -119,10 +115,10 @@ export async function getChunksByPdfIds(pdfIds: string[]) {
   }
 }
 
-export async function getAllUserChunks() {
+export async function getAllUserChunks(userId: string) {
   try {
     // First get all PDF IDs for the user
-    const pdfListResponse = await listPdfNames();
+    const pdfListResponse = await listPdfNames(userId);
     const pdfList = pdfListResponse.pdfs || [];
     
     if (pdfList.length === 0) {
@@ -141,10 +137,8 @@ export async function getAllUserChunks() {
 }
 
 // Function to search for relevant chunks
-export async function searchChunks(query: string, pdfIds?: string[]) {
+export async function searchChunks(query: string, userId: string, pdfIds?: string[]) {
   try {
-    const userId = await getUserId();
-    
     // If NEXT_PUBLIC_API_URL is not set, use a relative URL
     const apiUrl = process.env.NEXT_PUBLIC_API_URL 
       ? `${process.env.NEXT_PUBLIC_API_URL}/api/py/search` 

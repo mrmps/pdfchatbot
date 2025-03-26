@@ -9,27 +9,34 @@ import { MemoizedMarkdown } from '@/components/memoized-markdown';
 import { getUserId } from '@/lib/user-id';
 
 export function ChatInterface() {
-  const { messages, input, handleInputChange, handleSubmit, status } = useChat({
-    maxSteps: 3,
-  });
-  
-  const isLoading = status === 'submitted' || status === 'streaming';
-  const [expandedTools, setExpandedTools] = useState<Record<string, boolean>>({});
-  const [userId, setUserId] = useState<string>('Loading user ID...');
+  const [userId, setUserId] = useState<string>('');
+  const [isUserIdLoaded, setIsUserIdLoaded] = useState(false);
   
   useEffect(() => {
     async function fetchUserId() {
       try {
         const id = await getUserId();
         setUserId(id);
+        setIsUserIdLoaded(true);
       } catch (error) {
         console.error('Error fetching user ID:', error);
         setUserId('Error fetching user ID');
+        setIsUserIdLoaded(true);
       }
     }
     
     fetchUserId();
   }, []);
+  
+  const { messages, input, handleInputChange, handleSubmit, status } = useChat({
+    maxSteps: 3,
+    body: {
+      userId // Pass the user ID to the backend
+    }
+  });
+  
+  const isLoading = status === 'submitted' || status === 'streaming';
+  const [expandedTools, setExpandedTools] = useState<Record<string, boolean>>({});
   
   const toggleToolExpansion = (toolId: string) => {
     setExpandedTools(prev => ({
@@ -44,6 +51,20 @@ export function ChatInterface() {
       handleSubmit(e as unknown as React.FormEvent<HTMLFormElement>);
     }
   };
+  
+  // Wait for the user ID to be loaded before rendering the chat interface
+  if (!isUserIdLoaded) {
+    return (
+      <div className="flex flex-col h-full items-center justify-center">
+        <div className="animate-pulse flex flex-col items-center">
+          <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+            <Bot className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+          </div>
+          <p className="mt-4 text-gray-500 dark:text-gray-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="flex flex-col h-full">

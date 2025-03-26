@@ -1,11 +1,12 @@
 "use client"
 
 import type React from "react"
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Upload, File, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { uploadPdf } from "@/lib/actions"
+import { getUserId } from "@/lib/user-id"
 
 interface FileUploadProps {
   onUploadComplete: (files?: File[]) => void
@@ -17,7 +18,26 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
   const [progress, setProgress] = useState(0)
   const [uploadComplete, setUploadComplete] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [userId, setUserId] = useState<string>('')
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Get user ID on component mount
+  useEffect(() => {
+    async function fetchUserId() {
+      try {
+        const id = await getUserId();
+        setUserId(id);
+        if (!id || id === 'Error fetching user ID') {
+          setError('Unable to establish a user identity. Please refresh the page and try again.');
+        }
+      } catch (error) {
+        console.error('Error fetching user ID:', error);
+        setError('Error fetching user ID. Please refresh the page and try again.');
+      }
+    }
+    
+    fetchUserId();
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -39,6 +59,10 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
 
   const handleUpload = async () => {
     if (files.length === 0) return
+    if (!userId) {
+      setError("User ID not available. Please try again.");
+      return;
+    }
 
     setUploading(true)
     setProgress(0)
@@ -62,8 +86,8 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
         })
       }, 500)
 
-      // Upload files
-      const result = await uploadPdf(formData)
+      // Upload files with userId
+      const result = await uploadPdf(formData, userId)
 
       // Clear the interval
       clearInterval(interval)

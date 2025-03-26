@@ -40,13 +40,28 @@ export function PdfViewerDialog({ open, onOpenChange }: PdfViewerDialogProps) {
   const [filteredPdfList, setFilteredPdfList] = useState<PdfItem[]>([])
   const [formattedChunks, setFormattedChunks] = useState<{text: string, pageNumber?: number, index: number}[]>([])
   const [copiedChunk, setCopiedChunk] = useState<number | null>(null)
+  const [userId, setUserId] = useState<string>("")
+
+  // Fetch user ID on component mount
+  useEffect(() => {
+    async function fetchUserId() {
+      try {
+        const id = await getUserId();
+        setUserId(id);
+      } catch (error) {
+        console.error('Error fetching user ID:', error);
+      }
+    }
+    
+    fetchUserId();
+  }, []);
 
   // Fetch PDF list and content whenever the dialog opens
   useEffect(() => {
-    if (open) {
+    if (open && userId) {
       fetchPdfData();
     }
-  }, [open]);
+  }, [open, userId]);
 
   // Filter PDFs based on search query
   useEffect(() => {
@@ -61,17 +76,20 @@ export function PdfViewerDialog({ open, onOpenChange }: PdfViewerDialogProps) {
   }, [searchQuery, pdfList]);
 
   const fetchPdfData = async () => {
+    if (!userId) {
+      console.error("User ID not available");
+      setPdfContent("Error: User ID not available. Please refresh the page.");
+      return;
+    }
+
     setIsLoading(true);
     setPdfContent("Loading PDF content...");
     
     try {
       console.log("Fetching PDF data from API...");
       
-      // Get the user ID for listing PDFs
-      const userId = await getUserId();
-      
-      // Get the list of PDFs
-      const pdfListData = await listPdfNames();
+      // Get the list of PDFs with the userId
+      const pdfListData = await listPdfNames(userId);
       const pdfs = pdfListData.pdfs || [];
       setPdfList(pdfs);
       setFilteredPdfList(pdfs);
@@ -108,6 +126,11 @@ export function PdfViewerDialog({ open, onOpenChange }: PdfViewerDialogProps) {
   };
 
   const handleSelectPdf = async (pdfId: string, pdfName: string) => {
+    if (!userId) {
+      console.error("User ID not available");
+      return;
+    }
+    
     setSelectedPdf(pdfId);
     setIsLoading(true);
     setPdfContent(`Loading content for "${pdfName}"...`);
