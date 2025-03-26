@@ -196,6 +196,13 @@ export function ChatInterface() {
                                                   </span>
                                                 )}
                                             </span>
+                                          ) : part.toolInvocation.args.pdfIds ? (
+                                            <span className="text-[10px] sm:text-xs text-muted-foreground flex items-center">
+                                              <FileText className="h-2.5 sm:h-3 w-2.5 sm:w-3 mr-0.5 sm:mr-1" />
+                                              {Array.isArray(part.toolInvocation.args.pdfIds) 
+                                                ? `${part.toolInvocation.args.pdfIds.length} specific docs` 
+                                                : '1 specific doc'}
+                                            </span>
                                           ) : (
                                             <span className="text-[10px] sm:text-xs text-muted-foreground flex items-center">
                                               <FileText className="h-2.5 sm:h-3 w-2.5 sm:w-3 mr-0.5 sm:mr-1" />

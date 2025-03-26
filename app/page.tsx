@@ -37,12 +37,10 @@ export default function Home() {
                 priority
               />
             </div>
-            <Badge 
-              variant="secondary" 
-              className="px-2 py-0.5 text-[10px] sm:text-xs font-medium rounded-full bg-secondary/30 text-secondary-foreground"
-            >
-              PDF Chat
-            </Badge>
+            <div className="flex items-center">
+              <div className="h-3.5 w-[1px] bg-border/60 mx-2 opacity-70"></div>
+              <span className="text-xs text-muted-foreground">PDF Chat</span>
+            </div>
           </div>
 
           {/* Action buttons */}

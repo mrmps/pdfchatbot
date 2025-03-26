@@ -9,7 +9,7 @@ export async function POST(req: Request) {
   try {
     console.log("Chat API route called");
     const body = await req.json();
-    const { messages, pdfIds, userId } = body;
+    const { messages, userId } = body;
     
     // Require userId from the frontend
     if (!userId) {
@@ -102,10 +102,21 @@ export async function POST(req: Request) {
               z.array(z.string()).describe("Multiple PDF IDs to search within")
             ]).optional().describe("Optional specific PDF ID(s) to search within"),
             searchMode: z.enum(["unified", "individual"]).optional()
-              .describe("How to search: 'unified' (one search across all docs) or 'individual' (separate searches for each doc)")
+              .describe("How to search: 'unified' (one search across all docs) or 'individual' (separate searches for each doc)"),
+            pdfNames: z.any().optional().describe("PDF names being searched (set automatically)")
           }),
           execute: async ({ query, pdfIds, searchMode = "unified" }) => {
             console.log(`Searching PDFs with query: "${query}"${pdfIds ? ` in PDF IDs: ${JSON.stringify(pdfIds)}` : ''}, mode: ${searchMode}`);
+            
+            // Get PDF names for display in the UI right at the beginning
+            let pdfNames;
+            if (pdfIds) {
+              if (Array.isArray(pdfIds)) {
+                pdfNames = pdfIds.map(id => pdfIdToName[id] || id);
+              } else {
+                pdfNames = pdfIdToName[pdfIds] || pdfIds;
+              }
+            }
             
             try {
               // Get the full API URL for searching
@@ -188,16 +199,6 @@ export async function POST(req: Request) {
                 return "No relevant information found in the PDFs. Try rephrasing your question or searching for different terms.";
               }
               
-              // Get PDF names for display in the UI
-              let pdfNames;
-              if (pdfIds) {
-                if (Array.isArray(pdfIds)) {
-                  pdfNames = pdfIds.map(id => pdfIdToName[id] || id);
-                } else {
-                  pdfNames = pdfIdToName[pdfIds] || pdfIds;
-                }
-              }
-
               // Group results by PDF for better organization
               const resultsByPdf: Record<string, any[]> = {};
               
@@ -259,6 +260,7 @@ export async function POST(req: Request) {
               });
               
               console.log("Successfully created formatted results");
+              // Store the pdfNames in the args that get passed back to the UI
               return formattedResults.trim();
             } catch (error) {
               console.error("Error in searchPdfs tool:", error);
