@@ -5,10 +5,16 @@ import { FileUpload } from "@/components/file-upload"
 import { Chat } from "@/components/chat-interface"
 import { Button } from "@/components/ui/button"
 import { Upload, FileText, Github } from "lucide-react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { PdfViewerDialog } from "@/components/pdf-viewer-dialog"
 import Image from "next/image"
+import {
+  Credenza,
+  CredenzaContent,
+  CredenzaHeader,
+  CredenzaTitle,
+  CredenzaTrigger
+} from "@/components/ui/credenza"
 
 export default function Home() {
   const [viewingContent, setViewingContent] = useState(false)
@@ -25,10 +31,25 @@ export default function Home() {
           </Badge>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" className="flex items-center gap-2" onClick={() => setUploadingPdf(true)}>
-            <Upload className="h-4 w-4" />
-            Upload PDFs
-          </Button>
+          <Credenza open={uploadingPdf} onOpenChange={setUploadingPdf}>
+            <CredenzaTrigger asChild>
+              <Button variant="outline" className="flex items-center gap-2">
+                <Upload className="h-4 w-4" />
+                Upload PDFs
+              </Button>
+            </CredenzaTrigger>
+            <CredenzaContent className="sm:max-w-[500px]">
+              <CredenzaHeader>
+                <CredenzaTitle>Upload PDFs</CredenzaTitle>
+              </CredenzaHeader>
+              <div className="py-4 px-4 sm:px-6">
+                <p className="text-sm text-muted-foreground mb-4">
+                  Select PDF files to upload. After selecting files, click &ldquo;Process Selected PDFs&rdquo; to extract their content.
+                </p>
+                <FileUpload onUploadComplete={() => setUploadingPdf(false)} />
+              </div>
+            </CredenzaContent>
+          </Credenza>
 
           <Button variant="outline" className="flex items-center gap-2" onClick={() => setViewingContent(true)}>
             <FileText className="h-4 w-4" />
@@ -50,21 +71,6 @@ export default function Home() {
       <div className="flex-1 overflow-hidden">
         <Chat />
       </div>
-
-      {/* Dialog for uploading PDFs */}
-      <Dialog open={uploadingPdf} onOpenChange={setUploadingPdf}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Upload PDFs</DialogTitle>
-          </DialogHeader>
-          <div className="py-4">
-            <p className="text-sm text-muted-foreground mb-4">
-              Select PDF files to upload. After selecting files, click &ldquo;Process Selected PDFs&rdquo; to extract their content.
-            </p>
-            <FileUpload onUploadComplete={() => setUploadingPdf(false)} />
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* PDF Viewer Dialog */}
       <PdfViewerDialog open={viewingContent} onOpenChange={setViewingContent} />

@@ -22,7 +22,9 @@ export default function RootLayout({
           defaultTheme="system"
           enableSystem
         >
-          <main className="min-h-screen bg-background">{children}</main>
+          <div vaul-drawer-wrapper="" className="bg-background">
+            <main className="min-h-screen bg-background">{children}</main>
+          </div>
         </ThemeProvider>
       </body>
     </html>

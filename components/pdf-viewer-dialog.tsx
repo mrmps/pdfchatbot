@@ -221,9 +221,9 @@ export function PdfViewerDialog({ open, onOpenChange }: PdfViewerDialogProps) {
           </CredenzaDescription>
         </CredenzaHeader>
 
-        <CredenzaBody className="flex-1 h-[60vh] sm:h-[70vh] overflow-hidden p-0">
+        <div className="flex flex-col max-h-[50vh] sm:max-h-[60vh] md:max-h-[70vh] overflow-hidden">
           {isLoading && !selectedPdf ? (
-            <div className="w-full flex items-center justify-center h-full">
+            <div className="w-full flex items-center justify-center h-full min-h-[200px] p-4">
               <div className="flex flex-col items-center">
                 <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin text-primary mb-2" />
                 <span className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">Loading PDF library...</span>
@@ -252,7 +252,7 @@ export function PdfViewerDialog({ open, onOpenChange }: PdfViewerDialogProps) {
                   </div>
                 </div>
                 
-                <ScrollArea className="flex-1">
+                <ScrollArea className="flex-1 max-h-[calc(50vh-100px)] sm:max-h-[calc(60vh-100px)] md:max-h-[calc(70vh-100px)]">
                   <div className="p-1.5 sm:p-2">
                     {filteredPdfList.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-6 sm:py-8 px-4 text-center">
@@ -311,76 +311,78 @@ export function PdfViewerDialog({ open, onOpenChange }: PdfViewerDialogProps) {
                     </div>
                   
                     {/* Chunks view */}
-                    <ScrollArea className="flex-1 p-3 sm:p-4">
-                      {isLoading ? (
-                        <div className="w-full flex items-center justify-center py-8">
-                          <div className="flex flex-col items-center">
-                            <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin text-primary mb-2" />
-                            <span className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">Loading content...</span>
+                    <ScrollArea className="flex-1 max-h-[calc(50vh-80px)] sm:max-h-[calc(60vh-80px)] md:max-h-[calc(70vh-80px)]">
+                      <div className="p-3 sm:p-4">
+                        {isLoading ? (
+                          <div className="w-full flex items-center justify-center py-8">
+                            <div className="flex flex-col items-center">
+                              <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin text-primary mb-2" />
+                              <span className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">Loading content...</span>
+                            </div>
                           </div>
-                        </div>
-                      ) : (
-                        <>
-                          {formattedChunks.length > 0 ? (
-                            <div className="space-y-3 sm:space-y-4">
-                              {formattedChunks.map((chunk, idx) => (
-                                <Card key={idx} className="border border-zinc-200 dark:border-zinc-800 shadow-sm">
-                                  <CardHeader className="p-2.5 sm:p-3 flex flex-row items-center justify-between space-y-0 pb-2 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
-                                    <div className="flex items-center gap-1.5 sm:gap-2">
-                                      <Badge variant="outline" className="h-5 text-[10px] sm:text-xs px-1.5 sm:px-2 rounded-sm bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200">
-                                        Chunk {chunk.index}
-                                      </Badge>
-                                      {chunk.pageNumber && (
+                        ) : (
+                          <>
+                            {formattedChunks.length > 0 ? (
+                              <div className="space-y-3 sm:space-y-4">
+                                {formattedChunks.map((chunk, idx) => (
+                                  <Card key={idx} className="border border-zinc-200 dark:border-zinc-800 shadow-sm">
+                                    <CardHeader className="p-2.5 sm:p-3 flex flex-row items-center justify-between space-y-0 pb-2 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
+                                      <div className="flex items-center gap-1.5 sm:gap-2">
                                         <Badge variant="outline" className="h-5 text-[10px] sm:text-xs px-1.5 sm:px-2 rounded-sm bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200">
-                                          Page {chunk.pageNumber}
+                                          Chunk {chunk.index}
                                         </Badge>
-                                      )}
-                                    </div>
-                                    
-                                    <TooltipProvider>
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <Button 
-                                            variant="ghost" 
-                                            size="sm" 
-                                            className="h-7 w-7 p-0"
-                                            onClick={() => handleCopyChunk(idx, chunk.text)}
-                                          >
-                                            {copiedChunk === idx ? (
-                                              <Check className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-500" />
-                                            ) : (
-                                              <Copy className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-zinc-500" />
-                                            )}
-                                          </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                          {copiedChunk === idx ? "Copied!" : "Copy text"}
-                                        </TooltipContent>
-                                      </Tooltip>
-                                    </TooltipProvider>
-                                  </CardHeader>
-                                  <CardContent className="p-2.5 sm:p-3.5 text-xs sm:text-sm text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap">
-                                    {chunk.text}
-                                  </CardContent>
-                                </Card>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="flex flex-col items-center justify-center py-8 text-center">
-                              <div className="rounded-full bg-zinc-100 dark:bg-zinc-800 p-3 mb-4">
-                                <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-zinc-400 dark:text-zinc-500" />
+                                        {chunk.pageNumber && (
+                                          <Badge variant="outline" className="h-5 text-[10px] sm:text-xs px-1.5 sm:px-2 rounded-sm bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200">
+                                            Page {chunk.pageNumber}
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      
+                                      <TooltipProvider>
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Button 
+                                              variant="ghost" 
+                                              size="sm" 
+                                              className="h-7 w-7 p-0"
+                                              onClick={() => handleCopyChunk(idx, chunk.text)}
+                                            >
+                                              {copiedChunk === idx ? (
+                                                <Check className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-500" />
+                                              ) : (
+                                                <Copy className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-zinc-500" />
+                                              )}
+                                            </Button>
+                                          </TooltipTrigger>
+                                          <TooltipContent>
+                                            {copiedChunk === idx ? "Copied!" : "Copy text"}
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      </TooltipProvider>
+                                    </CardHeader>
+                                    <CardContent className="p-2.5 sm:p-3.5 text-xs sm:text-sm text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap">
+                                      {chunk.text}
+                                    </CardContent>
+                                  </Card>
+                                ))}
                               </div>
-                              <p className="text-zinc-500 dark:text-zinc-400 text-xs sm:text-sm max-w-md">
-                                {pdfContent}
-                              </p>
-                            </div>
-                          )}
-                        </>
-                      )}
+                            ) : (
+                              <div className="flex flex-col items-center justify-center py-8 text-center">
+                                <div className="rounded-full bg-zinc-100 dark:bg-zinc-800 p-3 mb-4">
+                                  <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-zinc-400 dark:text-zinc-500" />
+                                </div>
+                                <p className="text-zinc-500 dark:text-zinc-400 text-xs sm:text-sm max-w-md">
+                                  {pdfContent}
+                                </p>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </ScrollArea>
                   </>
                 ) : (
-                  <div className="flex-1 flex flex-col items-center justify-center p-4">
+                  <div className="flex-1 flex flex-col items-center justify-center p-4 min-h-[200px]">
                     {/* Show on larger screens when no PDF is selected */}
                     <div className="hidden md:flex flex-col items-center justify-center text-center max-w-md">
                       <div className="rounded-full bg-zinc-100 dark:bg-zinc-800 p-4 mb-4">
@@ -413,7 +415,7 @@ export function PdfViewerDialog({ open, onOpenChange }: PdfViewerDialogProps) {
               </div>
             </>
           )}
-        </CredenzaBody>
+        </div>
       </CredenzaContent>
     </Credenza>
   );
