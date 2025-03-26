@@ -81,7 +81,7 @@ export function ChatInterface() {
                     <div 
                       className={cn(
                         m.role === 'user' 
-                          ? "flex flex-col gap-4 bg-primary text-primary-foreground px-3 py-2 rounded-xl" 
+                          ? "flex flex-col gap-4 rounded-3xl bg-[#EDEFF2] text-primary-foreground px-3 py-2 text-black" 
                           : "flex flex-col gap-4 prose dark:prose-invert max-w-3xl"
                       )}
                     >
@@ -241,11 +241,6 @@ export function ChatInterface() {
                     </div>
                   </div>
                 </div>
-                {m.role === 'user' && (
-                  <div className="size-8 flex items-center rounded-full justify-center ring-1 shrink-0 ring-border bg-background">
-                    <User className="h-4 w-4" />
-                  </div>
-                )}
               </div>
             </div>
           ))

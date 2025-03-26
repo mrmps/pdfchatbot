@@ -378,40 +378,10 @@ async def search(user_id: str, query: str, pdf_id: list[str] = Query(None), sear
     except Exception as e:
         print(f"Search error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error during search: {str(e)}")
-
-@app.get("/list_pdfs")
-def list_pdfs(user_id: str):
-    """List all unique PDF names uploaded by the user and return all chunks with their contents."""
-    try:
-        # Query all rows for the user
-        results = table.query(filter=[["=", "user_id", user_id]])
-        
-        # Fix the DataFrame check
-        if results is not None and not results.empty:
-            # Get unique PDF IDs and names
-            pdf_data = results[["pdf_id", "pdf_name"]].drop_duplicates().to_dict('records')
-            
-            # Prepare chunks data
-            chunks = []
-            for _, row in results.iterrows():
-                chunks.append({
-                    "id": int(row["id"]),
-                    "pdf_id": str(row["pdf_id"]),
-                    "pdf_name": str(row["pdf_name"]),
-                    "chunk_text": str(row["chunk_text"])
-                })
-            
-            return {
-                "pdfs": pdf_data,
-                "chunks": chunks
-            }
-        return {"pdfs": [], "chunks": []}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error listing PDFs: {str(e)}")
     
 @app.get("/list_pdf_names")
 def list_pdf_names(user_id: str):
-    """List all unique PDF names and IDs uploaded by the user."""
+    """List all unique PDF names and IDs uploaded by a specific user."""
     try:
         # Query all rows for the user
         results = table.query(filter=[["=", "user_id", user_id]])
@@ -423,32 +393,42 @@ def list_pdf_names(user_id: str):
         
         return {"pdfs": []}
     except Exception as e:
+        print(f"Error listing PDF names: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error listing PDF names: {str(e)}")
 
-
-@app.get("/helloFastApi")
-def hello_fast_api():
-    """Simple hello endpoint to test the API."""
-    return {"message": "Hello from FastAPI"}
-
-@app.get("/list_all_chunks")
-def list_all_chunks(user_id: str, pdf_id: str = None, limit: int = 10000):
-    """List all chunks for a user with optional PDF ID filter."""
-    try:
-        # Construct filter
-        filter_list = [["=", "user_id", user_id]]
-        if pdf_id:
-            filter_list.append(["=", "pdf_id", pdf_id])
+@app.get("/get_chunks_by_pdf_ids")
+def get_chunks_by_pdf_ids(
+    pdf_ids: list[str] = Query(None, description="List of PDF IDs to retrieve chunks for"),
+    limit: int = 10000
+):
+    """Get all chunks for a list of PDF IDs"""
+    try:     
+        if not pdf_ids:
+            print("No PDF IDs provided, returning empty result")
+            return {"chunks": []}
+        
+        # Construct a proper filter for the PDF IDs - KDB.AI expects each filter to be a list
+        if len(pdf_ids) == 1:
+            # If there's only one PDF ID, use a simple equality filter as a list
+            filter_list = [["=", "pdf_id", pdf_ids[0]]]
+        else:
+            # For multiple PDF IDs, use multiple equality filters with OR
+            or_filter = ["or"]
+            for pdf_id in pdf_ids:
+                or_filter.append(["=", "pdf_id", pdf_id])
+            filter_list = [or_filter]
+        
+        print(f"Query filter: {filter_list}")
         
         # Query chunks
         results = table.query(
             filter=filter_list,
             limit=limit
         )
-
-        print(f"Results: {results}")
         
-        # Fix the DataFrame check
+        print(f"Query returned {len(results) if results is not None and not results.empty else 0} results")
+        
+        # Check if results exist
         if results is None or results.empty:
             return {"chunks": []}
         
@@ -464,8 +444,11 @@ def list_all_chunks(user_id: str, pdf_id: str = None, limit: int = 10000):
         
         return {"chunks": chunks}
     except Exception as e:
-        # Simple error handling
-        raise HTTPException(status_code=500, detail=f"Error listing chunks: {str(e)}")
+        print(f"Error retrieving chunks: {str(e)}")
+        # Include the traceback for better debugging
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error retrieving chunks: {str(e)}")
 
 # Run the app (for local development)
 if __name__ == "__main__":
