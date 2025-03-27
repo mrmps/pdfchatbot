@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
     }
     
     // Build the search URL with query parameters
-    const searchUrl = new URL(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/api/py/search`)
+    const searchUrl = new URL(`https://pdfchat.replit.app/search`)
     searchUrl.searchParams.append("user_id", user_id)
     searchUrl.searchParams.append("query", query)
     
