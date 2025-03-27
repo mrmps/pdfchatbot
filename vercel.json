@@ -1,0 +1,31 @@
+{
+  "functions": {
+    "api/**": {
+      "includeFiles": [
+        "api/**", 
+        "requirements.txt"
+      ],
+      "excludeFiles": [
+        "venv/**",
+        "node_modules/**",
+        ".next/**",
+        "public/**",
+        "app/**",
+        "components/**",
+        "hooks/**"
+      ]
+    },
+    "app/api/**": {
+      "excludeFiles": [
+        "{.next,*.cache}/**",
+        "node_modules/pdfjs-dist/**",
+        "node_modules/@langchain/**",
+        "node_modules/kdbai-client/**",
+        "node_modules/pandas/**",
+        "node_modules/openai/**",
+        "venv/**",
+        "api/**"
+      ]
+    }
+  }
+} 
