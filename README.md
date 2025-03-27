@@ -5,7 +5,7 @@
   <h3 align="center">Chat with your PDFs using AI and vector search</h3>
 </p>
 
-<p align="center">Frontend built with Next.js, connected to an external FastAPI backend.</p>
+<p align="center">Frontend built with Next.js, connected to an external FastAPI backend. Deployed at <a href="https://pdfgpt.dev">pdfgpt.dev</a>.</p>
 
 ## Introduction
 
@@ -25,7 +25,7 @@ This application allows users to upload PDFs, process them into searchable chunk
 The application consists of:
 
 1. **Next.js Frontend**: Handles UI, user interactions, and client-side PDF processing
-2. **External FastAPI Backend**: Manages vector database operations and AI search (a simple FastAPI backend hosted at https://replit.com/@MichaelR35/KDBAI-PDF-Chatbot-Backend
+2. **External FastAPI Backend**: Manages vector database operations and AI search (a simple FastAPI backend hosted at https://replit.com/@MichaelR35/KDBAI-PDF-ChatBot-Backend
 3. **KDB.AI**: Vector database for semantic search
 4. **OpenAI**: Provides embeddings and AI capabilities
 5. **Vercel AI SDK**: Manages tool calling and AI interactions
