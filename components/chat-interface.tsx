@@ -150,11 +150,11 @@ export function ChatInterface() {
                           <>
                             {/* Display search queries and results */}
                             {m.parts.some(part => part.type === 'tool-invocation') && (
-                              <div className="mb-3 bg-muted/30 rounded-lg overflow-hidden border border-border/50 text-sm">
+                              <div className="mb-3 bg-muted/30 rounded-lg overflow-hidden border border-border/50 text-sm w-full">
                                 {m.parts.map(part => 
                                   part.type === 'tool-invocation' && part.toolInvocation.toolName === 'searchPdfs' && (
-                                    <div key={part.toolInvocation.toolCallId}>
-                                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 p-2 sm:p-3 border-b border-border/50 bg-muted/50">
+                                    <div key={part.toolInvocation.toolCallId} className="w-full">
+                                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 p-2 sm:p-3 border-b border-border/50 bg-muted/50 w-full">
                                         <Search className="h-3 sm:h-3.5 w-3 sm:w-3.5 text-muted-foreground flex-shrink-0" />
                                         <span className="text-xs font-medium mr-auto">
                                           <span className="text-muted-foreground">Searched:</span> <span className="text-foreground line-clamp-1">{part.toolInvocation.args.query}</span>
@@ -228,7 +228,7 @@ export function ChatInterface() {
                                       </div>
                                       
                                       {part.toolInvocation.state === 'result' && expandedTools[part.toolInvocation.toolCallId] && (
-                                        <div className="max-h-[200px] sm:max-h-[250px] md:max-h-[350px] overflow-y-auto p-2 sm:p-3 text-xs sm:text-sm bg-background/50">
+                                        <div className="max-h-[200px] sm:max-h-[250px] md:max-h-[350px] overflow-y-auto p-2 sm:p-3 text-xs sm:text-sm bg-background/50 w-full">
                                           <div className="prose dark:prose-invert max-w-full prose-sm sm:prose-base break-words">
                                             {/* Custom rendering for search results to show individual chunks */}
                                             {part.toolInvocation.result.includes('## From:') ? (
@@ -282,6 +282,16 @@ export function ChatInterface() {
                                                 content={part.toolInvocation.result} 
                                               />
                                             )}
+                                          </div>
+                                        </div>
+                                      )}
+                                      {part.toolInvocation.state !== 'result' && (
+                                        <div className="p-2 sm:p-3 text-xs sm:text-sm bg-background/50 w-full flex items-center justify-center">
+                                          <div className="animate-pulse flex items-center gap-1.5 sm:gap-2 text-muted-foreground">
+                                            <div className="size-2 rounded-full bg-current"></div>
+                                            <div className="size-2 rounded-full bg-current animation-delay-150"></div>
+                                            <div className="size-2 rounded-full bg-current animation-delay-300"></div>
+                                            <span className="ml-1 text-xs">Searching documents...</span>
                                           </div>
                                         </div>
                                       )}
