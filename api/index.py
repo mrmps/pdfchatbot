@@ -10,10 +10,10 @@ from dotenv import load_dotenv
 import os
 import uuid
 import json
-import time
 import traceback
-import asyncio
 from concurrent.futures import ThreadPoolExecutor
+import pandas as pd
+import shortuuid
 
 # Load environment variables from .env file
 load_dotenv()
@@ -158,302 +158,156 @@ def create_table():
     ]
     table = database.create_table(KDBAI_TABLE_NAME, schema=schema, indexes=indexes)
     return {"message": f"Table '{KDBAI_TABLE_NAME}' created successfully"}
-    
+
+
 @app.post("/api/py/upload_pdf")
 async def upload_pdf(request: Request):
-    """Uploads, embeds, and inserts PDF chunks with optimized batching for large files."""
-    print("Starting PDF upload process...")
+    """Uploads, embeds, and inserts PDF chunks using Pandas."""
     try:
-        # First, read the raw body to avoid connection issues with large form data
-        body = await request.body()
+        # Add debug logging
+        print("Starting PDF upload process...")
         content_type = request.headers.get("content-type", "")
-        
-        # Check if this is a multipart form
+        print(f"Content-Type: {content_type}")
+
+        # Handle multipart form data
         if "multipart/form-data" in content_type:
             print("Processing multipart form data...")
-            form_data = await request.form()
-            user_id = form_data.get('userId')
-            parsed_data_str = form_data.get('parsedData')
+            form = await request.form()
+            
+            # Extract data from form
+            user_id = form.get("userId")
+            parsed_data = form.get("parsedData")
+            
+            if not user_id:
+                raise HTTPException(status_code=400, detail="Missing required field: userId")
+            if not parsed_data:
+                raise HTTPException(status_code=400, detail="Missing required field: parsedData")
+            
+            # Parse the parsedData string into JSON if needed
+            if isinstance(parsed_data, str):
+                try:
+                    parsed_data = json.loads(parsed_data)
+                except json.JSONDecodeError as je:
+                    print(f"Error parsing parsedData JSON: {je}")
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Invalid JSON in parsedData field"
+                    )
+            
+            data = {
+                "userId": user_id,
+                "parsedData": parsed_data
+            }
         else:
-            # Handle JSON body as an alternative
-            print("Processing JSON body...")
-            body_json = await request.json()
-            user_id = body_json.get('userId')
-            parsed_data_str = body_json.get('parsedData')
-            
-        if not user_id or not parsed_data_str:
-            print(f"Missing required data: userId={bool(user_id)}, parsedData={bool(parsed_data_str)}")
-            raise HTTPException(status_code=422, detail="Missing userId or parsedData")
-
-        print(f"Received data for user_id: {user_id}")
-        print(f"parsedData length: {len(parsed_data_str)} characters")
-
-        print("Parsing JSON data...")
-        parsed_data = json.loads(parsed_data_str) if isinstance(parsed_data_str, str) else parsed_data_str
-        documents = parsed_data.get('documents', [])
-        print(f"Found {len(documents)} documents in parsed data")
-        if not documents: 
-            return {"message": "No documents provided."}
-
-        # Get the current max ID to avoid duplicates
-        try:
-            max_id_result = table.query(query="select max(id) as max_id from pdf_chunks")
-            next_id = 1
-            if max_id_result is not None and len(max_id_result) > 0 and max_id_result[0].get('max_id') is not None:
-                next_id = int(max_id_result[0]['max_id']) + 1
-            print(f"Starting with ID: {next_id}")
-        except Exception as e:
-            print(f"Could not get max ID, using default: {e}")
-            next_id = 1
-            
-        # Process each document separately
-        total_chunks_processed = 0
-        total_chunks_inserted = 0
-        all_results = []
-        
-        for doc_index, document in enumerate(documents):
+            # Handle JSON data
             try:
-                doc_start_time = time.time()
-                filename = document.get('filename', f"document_{doc_index}")
-                chunks = document.get('chunks', [])
-                
-                print(f"Processing document {doc_index+1}/{len(documents)}: {filename} with {len(chunks)} chunks")
-                
-                if not chunks:
-                    print(f"  No chunks in document {filename}, skipping")
-                    all_results.append({
-                        "success": False,
-                        "pdf_name": filename,
-                        "error": "No chunks provided"
-                    })
-                    continue
-                
-                # Generate a unique ID for this PDF
-                pdf_id = str(uuid.uuid4())
-                
-                # 1. Prepare all texts and corresponding metadata
-                print(f"  Preparing texts for document {doc_index+1}: {filename}")
-                texts_to_embed = []
-                metadata_list = []
-                current_id = next_id
-                
-                for i, chunk_text in enumerate(chunks):
-                    if chunk_text and chunk_text.strip():  
-                        # Truncate very long chunks to prevent excessive data sizes
-                        clean_text = chunk_text.strip()
-                        if len(clean_text) > 10000:  # 10KB max per chunk
-                            clean_text = clean_text[:10000] + "... [truncated]"
-                            print(f"    Truncated chunk {i} (too long)")
-                            
-                        texts_to_embed.append(clean_text)
-                        metadata_list.append({
-                            "id": current_id,
-                            "user_id": user_id,
-                            "pdf_id": pdf_id,
-                            "pdf_name": filename
-                        })
-                        current_id += 1
-                
-                if not texts_to_embed:
-                    print(f"  No valid text chunks in document {filename}, skipping")
-                    all_results.append({
-                        "success": False,
-                        "pdf_name": filename,
-                        "error": "No valid text chunks could be extracted"
-                    })
-                    continue
-                
-                # 2. Generate embeddings in batches
-                print(f"  Generating embeddings for {len(texts_to_embed)} chunks")
-                embedding_start_time = time.time()
-                all_embeddings = []
-                
-                # Process in batches with retry logic
-                for i in range(0, len(texts_to_embed), OPENAI_BATCH_LIMIT):
-                    batch_texts = texts_to_embed[i:min(i + OPENAI_BATCH_LIMIT, len(texts_to_embed))]
-                    batch_num = i // OPENAI_BATCH_LIMIT + 1
-                    total_batches = (len(texts_to_embed) + OPENAI_BATCH_LIMIT - 1) // OPENAI_BATCH_LIMIT
-                    
-                    print(f"    Embedding batch {batch_num}/{total_batches} ({len(batch_texts)} chunks)")
-                    
-                    # Add retry logic
-                    max_retries = 3
-                    retry_delay = 2  # seconds
-                    batch_embeddings = None
-                    
-                    for attempt in range(max_retries):
-                        try:
-                            batch_embeddings = get_embeddings_batch(
-                                batch_texts, dimensions=OPENAI_EMBEDDING_DIMENSIONS
-                            )
-                            break  # Success, exit retry loop
-                        except Exception as e:
-                            print(f"    Error on attempt {attempt+1}/{max_retries}: {e}")
-                            if attempt < max_retries - 1:
-                                wait_time = retry_delay * (2 ** attempt)
-                                print(f"    Waiting {wait_time}s before retry...")
-                                time.sleep(wait_time)
-                            else:
-                                print("    All retries failed, trying individual embeddings")
-                                # Individual fallback mode
-                                batch_embeddings = []
-                                for j, text in enumerate(batch_texts):
-                                    try:
-                                        embedding = embed_single_text(text)
-                                        batch_embeddings.append(embedding)
-                                    except Exception as e2:
-                                        print(f"      Failed to embed item {j+1}: {e2}")
-                                        batch_embeddings.append([0.0] * OPENAI_EMBEDDING_DIMENSIONS)
-                    
-                    if batch_embeddings:
-                        all_embeddings.extend(batch_embeddings)
-                
-                embedding_time = time.time() - embedding_start_time
-                print(f"  Embedding completed in {embedding_time:.2f}s ({len(texts_to_embed) / embedding_time:.2f} chunks/sec)")
-                
-                # 3. Prepare data rows for insertion
-                print(f"  Preparing rows for insertion")
-                data_rows = []
-                for i in range(min(len(texts_to_embed), len(all_embeddings))):
-                    data_rows.append({
-                        **metadata_list[i],
-                        "chunk_text": texts_to_embed[i],
-                        "embeddings": all_embeddings[i]
-                    })
-                
-                # 4. Insert into KDB.AI in small batches
-                if data_rows:
-                    print(f"  Inserting {len(data_rows)} rows for document: {filename}")
-                    
-                    # Calculate optimal batch size
-                    if data_rows:
-                        # Serialize one row to estimate size
-                        sample_row = data_rows[0]
-                        serialized_sample = json.dumps(sample_row)
-                        bytes_per_row = len(serialized_sample)
-                        
-                        # Calculate optimal batch size (aim for 5MB max per batch)
-                        max_batch_bytes = 5 * 1024 * 1024  # 5MB
-                        optimal_batch_size = max(1, min(KDBAI_INSERT_BATCH_SIZE, max_batch_bytes // bytes_per_row))
-                        
-                        print(f"    Estimated size per row: {bytes_per_row / 1024:.2f}KB")
-                        print(f"    Using dynamic batch size: {optimal_batch_size} rows")
-                    else:
-                        optimal_batch_size = KDBAI_INSERT_BATCH_SIZE
-                    
-                    insertion_start_time = time.time()
-                    successful_inserts = 0
-                    
-                    for i in range(0, len(data_rows), optimal_batch_size):
-                        batch = data_rows[i:i + optimal_batch_size]
-                        batch_num = i // optimal_batch_size + 1
-                        total_batches = (len(data_rows) + optimal_batch_size - 1) // optimal_batch_size
-                        
-                        # Double-check batch size
-                        batch_serialized = json.dumps(batch)
-                        batch_size_mb = len(batch_serialized) / (1024 * 1024)
-                        
-                        print(f"    Inserting batch {batch_num}/{total_batches} with {len(batch)} rows ({batch_size_mb:.2f}MB)")
-                        
-                        # If batch is still too large, reduce further
-                        if batch_size_mb > 8:  # Safety margin below 10MB
-                            print(f"    Batch too large ({batch_size_mb:.2f}MB), reducing further...")
-                            
-                            # Insert one by one as last resort
-                            for single_row in batch:
-                                try:
-                                    table.insert([single_row])  # Must be a list
-                                    successful_inserts += 1
-                                except Exception as e:
-                                    print(f"      Failed to insert row: {e}")
-                        else:
-                            # Insert normal sized batch with retry
-                            max_retries = 3
-                            for attempt in range(max_retries):
-                                try:
-                                    table.insert(batch)
-                                    successful_inserts += len(batch)
-                                    break  # Success, exit retry loop
-                                except Exception as e:
-                                    print(f"    Error inserting batch {batch_num} (attempt {attempt+1}/{max_retries}): {e}")
-                                    if "maximum serialized size" in str(e).lower():
-                                        print("    Batch too large, switching to individual row insertion")
-                                        
-                                        # Try inserting one by one
-                                        sub_successful = 0
-                                        for single_row in batch:
-                                            try:
-                                                table.insert([single_row])  # Must be a list
-                                                sub_successful += 1
-                                            except Exception as sub_e:
-                                                print(f"      Failed to insert row: {sub_e}")
-                                        
-                                        successful_inserts += sub_successful
-                                        print(f"      Successfully inserted {sub_successful}/{len(batch)} individual rows")
-                                        break  # Exit retry loop after individual processing
-                                    
-                                    elif attempt < max_retries - 1:
-                                        wait_time = retry_delay * (2 ** attempt)
-                                        print(f"    Waiting {wait_time}s before retry...")
-                                        time.sleep(wait_time)
-                                    else:
-                                        print(f"    Failed to insert batch {batch_num} after {max_retries} attempts")
-                    
-                    insertion_time = time.time() - insertion_start_time
-                    doc_total_time = time.time() - doc_start_time
-                    
-                    print(f"  Document {doc_index+1}/{len(documents)} completed:")
-                    print(f"    Total time: {doc_total_time:.2f}s")
-                    print(f"    Embedding time: {embedding_time:.2f}s")
-                    print(f"    Insertion time: {insertion_time:.2f}s")
-                    print(f"    Chunks inserted: {successful_inserts}/{len(data_rows)}")
-                    
-                    # Update next_id for the next document
-                    next_id = current_id
-                    
-                    # Update counters
-                    total_chunks_processed += len(texts_to_embed)
-                    total_chunks_inserted += successful_inserts
-                    
-                    # Add success result
-                    all_results.append({
-                        "success": successful_inserts > 0,
-                        "pdf_id": pdf_id,
-                        "pdf_name": filename,
-                        "chunks_processed": len(texts_to_embed),
-                        "chunks_inserted": successful_inserts,
-                        "processing_time": {
-                            "total_seconds": round(doc_total_time, 2),
-                            "embedding_seconds": round(embedding_time, 2),
-                            "insertion_seconds": round(insertion_time, 2)
-                        }
-                    })
-            
-            except Exception as doc_error:
-                print(f"Error processing document {doc_index+1}: {str(doc_error)}")
-                all_results.append({
-                    "success": False,
-                    "pdf_name": document.get('filename', f"document_{doc_index}"),
-                    "error": str(doc_error)
-                })
-        
-        # 5. Return the combined results
-        success = any(result['success'] for result in all_results)
-        
-        return {
-            "success": success,
-            "documents_processed": len(all_results),
-            "total_chunks_processed": total_chunks_processed,
-            "total_chunks_inserted": total_chunks_inserted,
-            "results": all_results
-        }
+                data = await request.json()
+            except json.JSONDecodeError as je:
+                body = await request.body()
+                print(f"JSON parsing error: {je}")
+                print(f"Raw body content: {body.decode()[:200]}...")
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid JSON format: {str(je)}"
+                )
 
+        # Extract required fields
+        user_id = data.get('userId')
+        parsed_data = data.get('parsedData')
+
+        if not user_id:
+            raise HTTPException(status_code=400, detail="Missing required field: userId")
+        if not parsed_data:
+            raise HTTPException(status_code=400, detail="Missing required field: parsedData")
+
+        # Process the documents
+        docs = parsed_data.get('documents', [])
+        if not docs:
+            return {"message": "No documents provided"}
+
+        # Continue with the rest of your existing processing code...
+        rows = []
+        for doc in docs:
+            pdf_id = str(uuid.uuid4())
+            rows.extend([
+                {
+                    "chunk_text": c.strip(),
+                    "user_id": user_id,
+                    "pdf_id": pdf_id,
+                    "pdf_name": doc.get('filename', 'unknown')
+                }
+                for c in doc.get('chunks', []) if c and c.strip()
+            ])
+        if not rows: return {"message": "No valid chunks found"} # 8. Handle no chunks
+
+        df = pd.DataFrame(rows) # 9. Create Pandas DataFrame
+        
+        # 10. Generate embeddings for all chunks at once (assumes function handles batching)
+        # Generate embeddings in batches of 2048
+        import time
+        embedding_start_time = time.time()
+        
+        batch_size = 2048
+        all_embeddings = []
+        
+        for i in range(0, len(df), batch_size):
+            batch_texts = df['chunk_text'].iloc[i:i+batch_size].tolist()
+            print(f"Generating embeddings for batch {i//batch_size + 1}/{(len(df) + batch_size - 1)//batch_size} ({len(batch_texts)} texts)")
+            
+            response = openai.embeddings.create(
+                input=batch_texts,
+                model=OPENAI_EMBEDDING_MODEL,
+                dimensions=OPENAI_EMBEDDING_DIMENSIONS
+            )
+            
+            batch_embeddings = [item.embedding for item in response.data]
+            all_embeddings.extend(batch_embeddings)
+        
+        embedding_end_time = time.time()
+        embedding_duration = embedding_end_time - embedding_start_time
+        print(f"Embedding completed in {embedding_duration:.2f} seconds")
+        
+        df['embeddings'] = all_embeddings
+        # Add the required 'id' field using shortuuid
+        df['id'] = [int(shortuuid.uuid()[:7], 36) for _ in range(len(df))]
+
+        # Insert in batches of 500 rows
+        insert_start_time = time.time()
+        batch_size = 500
+        for i in range(0, len(df), batch_size):
+            batch_df = df.iloc[i:i+batch_size]
+            table.insert(batch_df)
+            print(f"Inserted batch {i//batch_size + 1}/{(len(df) + batch_size - 1)//batch_size} ({len(batch_df)} rows)")
+        
+        insert_end_time = time.time()
+        insert_duration = insert_end_time - insert_start_time
+        print(f"KDB.AI insertion completed in {insert_duration:.2f} seconds")
+        
+        total_duration = embedding_duration + insert_duration
+        
+        # 12. Return success response with timing information
+        return {
+            "success": True, 
+            "chunks_inserted": len(df),
+            "timing": {
+                "embedding_seconds": round(embedding_duration, 2),
+                "insertion_seconds": round(insert_duration, 2),
+                "total_seconds": round(total_duration, 2)
+            }
+        }
     except json.JSONDecodeError as e:
         print(f"JSON decode error: {e}")
-        raise HTTPException(status_code=400, detail=f"Invalid JSON: {e}")
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Invalid JSON: {str(e)}. Please check the request format."
+        )
     except Exception as e:
-        print(f"Upload Error: {e}\n{traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+        print(f"Upload Error: {str(e)}")
+        print(f"Full traceback: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Upload failed: {str(e)}"
+        )
 
 def _process_result_row(row: Any) -> Optional[Dict[str, Any]]:
     """
