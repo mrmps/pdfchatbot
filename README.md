@@ -1,7 +1,7 @@
 # PDF Chat with KDB.AI
 
 <p align="center">
-  <img src="https://assets.vercel.com/image/upload/v1588805858/repositories/vercel/logo.png" height="96">
+  <img src="https://kdb.ai/files/2024/01/kdbai-logo.svg" height="96">
   <h3 align="center">Chat with your PDFs using AI and vector search</h3>
 </p>
 
