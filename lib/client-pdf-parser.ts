@@ -125,92 +125,59 @@ async function extractTextFromPdfFile(file: File): Promise<string> {
           return reject(new Error('Failed to read the file'));
         }
         
-        // Get the file content as a string
+        // Get the file content as an ArrayBuffer
         const fileContent = event.target.result as ArrayBuffer;
         
-        // For PDF files, we can't directly get the text content from the ArrayBuffer
-        // Instead, we'll use a more robust approach to extract text 
-        
-        // Convert ArrayBuffer to a string
-        const textDecoder = new TextDecoder('utf-8');
-        let text = textDecoder.decode(fileContent);
-        
-        // Enhanced text cleaning for better extraction quality
-        // First pass - extract meaningful text blocks
-        text = text
-          // Remove binary content indicators
-          .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ' ')
-          // Remove PDF-specific markers
-          .replace(/<<\/[^>]+>>/g, ' ')
-          // Clean up common PDF artifacts 
-          .replace(/(\(cid:\d+\))|(\(FORMFEED\))/g, ' ')
-          // Normalize whitespace
-          .replace(/\s+/g, ' ');
-        
-        // Second pass - identify and extract text sections
-        // Look for patterns that often indicate text content in PDFs
-        const textPatterns = [
-          /\(([^)]{2,})\)/g,              // Content in parentheses (common PDF text format)
-          /\/Text\s*([^/]+)/g,            // Text blocks
-          /TJ\s*\[([^\]]+)\]/g,           // Text positioning blocks
-          /(\/\w+\s+\d+\s+Tf\s*)?(\([^)]+\)\s*)+Tj/g, // Text drawing operations
-        ];
-        
-        let extractedText = '';
-        
-        // Apply each pattern and collect results
-        textPatterns.forEach(pattern => {
-          const matches = text.match(pattern);
-          if (matches) {
-            extractedText += ' ' + matches.join(' ');
+        // For browser-based PDF parsing, we need to use PDF.js
+        if (typeof window !== 'undefined') {
+          // Check if PDF.js is already loaded
+          if (!(window as any).pdfjsLib) {
+            console.log('Loading PDF.js library...');
+            // Load PDF.js from CDN
+            const pdfjsScript = document.createElement('script');
+            pdfjsScript.src = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js';
+            document.head.appendChild(pdfjsScript);
+            
+            // Wait for the script to load
+            await new Promise<void>((resolve) => {
+              pdfjsScript.onload = () => resolve();
+            });
+            
+            // Set worker source
+            (window as any).pdfjsLib.GlobalWorkerOptions.workerSrc = 
+              'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
           }
-        });
-        
-        // If we got meaningful extracted text, use it
-        if (extractedText.length > 1000) {
-          text = extractedText;
-        }
-        
-        // Final cleanup
-        text = text
-          // Extract content from PDF notation parentheses
-          .replace(/\(([^)]+)\)/g, '$1')
-          // Remove common PDF control sequences
-          .replace(/\\(\d{3}|n|r|t|f|\\|\(|\))/g, ' ')
-          // Remove remaining non-printable characters but keep newlines and tabs
-          .replace(/[^\x20-\x7E\x0A\x0D\t]/g, ' ')
-          // Normalize unicode space characters 
-          .replace(/[\u2000-\u200F\u2028-\u202F\u205F-\u206F]/g, ' ')
-          // Clean up PDF specific artifacts like form feed characters
-          .replace(/(\(cid:\d+\))|(\(FORMFEED\))/g, ' ')
-          // Normalize spaces again to clean up leftovers
-          .replace(/\s+/g, ' ')
-          // Final trim
-          .trim();
-        
-        // If text extraction failed or returned very little text, send a placeholder
-        if (!text || text.length < 200) {
-          console.warn('Basic text extraction yielded minimal results. Using fallback message.');
-          text = `This PDF document (${file.name}) may contain images, scanned content, or be protected against text extraction. ` +
-                 `The document was processed but minimal text could be extracted. ` +
-                 `File size: ${Math.round(file.size / 1024)} KB`;
-        }
-        
-        // For very large PDFs, we want to handle them more efficiently
-        if (text.length > 10000000) { // 10 MB of text
-          console.warn(`Very large text content (${(text.length / 1000000).toFixed(2)} MB) detected, optimizing...`);
-          // Trim redundant whitespace more aggressively
-          text = text.replace(/[ \t]+/g, ' ').replace(/\n\s+/g, '\n');
           
-          // Optionally truncate extremely large texts
-          if (text.length > 30000000) { // 30MB is excessive
-            console.warn(`Extremely large text (${(text.length / 1000000).toFixed(2)} MB), truncating to 30MB`);
-            text = text.substring(0, 30000000) + 
-                   "\n\n[Content truncated due to excessive size. The full document was too large to process completely.]";
+          // Use PDF.js to load and parse the PDF
+          const pdfjs = (window as any).pdfjsLib;
+          const loadingTask = pdfjs.getDocument({ data: new Uint8Array(fileContent) });
+          const pdf = await loadingTask.promise;
+          
+          console.log(`PDF loaded with ${pdf.numPages} pages`);
+          
+          // Extract text from all pages
+          let fullText = '';
+          for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const textContent = await page.getTextContent();
+            const pageText = textContent.items
+              .map((item: any) => item.str)
+              .join(' ');
+            
+            fullText += `${pageText}\n`;
           }
+          
+          if (fullText.trim().length < 200) {
+            console.warn('PDF.js extracted minimal text. The PDF might be scanned or image-based.');
+            fullText += `\n[Note: This PDF (${file.name}) appears to contain mostly images or scanned content. Text extraction was limited.]`;
+          }
+          
+          resolve(fullText);
+        } else {
+          // If we're not in a browser environment, throw an error
+          reject(new Error('PDF parsing is only supported in browser environments'));
         }
         
-        resolve(text);
       } catch (error) {
         console.error('Error extracting text from PDF:', error);
         reject(error);
