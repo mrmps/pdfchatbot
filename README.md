@@ -1,7 +1,7 @@
 # PDF Chat with KDB.AI
 
 <p align="center">
-  <img src="https://kdb.ai/files/2024/01/kdbai-logo.svg" height="96">
+  <img src="https://images.squarespace-cdn.com/content/v1/647d8c96bffcb2144748f3fb/1705538561045-CHWGG2BXH9B2DTTD6FH6/KDB-AI_GlyphLoop_cover.gif" height="96">
   <h3 align="center">Chat with your PDFs using AI and vector search</h3>
 </p>
 
