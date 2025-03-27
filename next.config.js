@@ -34,25 +34,6 @@ const nextConfig = {
       bodySizeLimit: '50mb',
     },
   },
-  // Configure output file tracing to optimize serverless functions
-  output: 'standalone',
-  outputFileTracing: true,
-  outputFileTracingExcludes: {
-    '*': [
-      'node_modules/@next/swc-*',
-      'node_modules/next/dist/compiled/@swc/*',
-      'node_modules/pdfjs-dist/**',
-      'node_modules/@langchain/**',
-      'node_modules/openai/**',
-      '.git/**',
-      '**.*.map',
-      '**.*.d.ts',
-      'venv/**',
-      '*/test/**',
-      'node_modules/kdbai-client/**',
-      'node_modules/pdf-parse/**'
-    ],
-  },
 };
 
 module.exports = withBundleAnalyzer(nextConfig);
