@@ -6,7 +6,6 @@ import { getUserId } from "@/lib/user-id"
 import { listPdfNames, getChunksByPdfIds } from "@/lib/actions"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -51,6 +50,7 @@ export function PdfViewerDialog({ open, onOpenChange }: PdfViewerDialogProps) {
   const [userId, setUserId] = useState<string>("")
   const [showMobileList, setShowMobileList] = useState(true)
   const [selectedPdfName, setSelectedPdfName] = useState<string>("")
+  const [lastRefreshTimestamp, setLastRefreshTimestamp] = useState<number>(0)
 
   // Fetch user ID on component mount
   useEffect(() => {
@@ -82,11 +82,13 @@ export function PdfViewerDialog({ open, onOpenChange }: PdfViewerDialogProps) {
       try {
         console.log("Fetching PDF data from API...");
         
-        // Get the list of PDFs with the userId
-        const pdfListData = await listPdfNames(userId);
+        // Get the list of PDFs with the userId - add timestamp to prevent caching
+        const timestamp = Date.now();
+        const pdfListData = await listPdfNames(userId);  // Remove timestamp parameter for now
         const pdfs = pdfListData.pdfs || [];
         setPdfList(pdfs);
         setFilteredPdfList(pdfs);
+        setLastRefreshTimestamp(timestamp); // Still store timestamp for key generation
         
         if (pdfs.length === 0) {
           setPdfContent("No PDFs uploaded yet. Upload some PDFs to see their content here.");
@@ -158,9 +160,9 @@ export function PdfViewerDialog({ open, onOpenChange }: PdfViewerDialogProps) {
     try {
       console.log(`Loading content for PDF: ${pdfName} (ID: ${pdfId})`);
       
-      // Always fetch fresh chunks for the selected PDF
+      // Pass timestamp to avoid caching - but remove for now to fix error
       console.log(`Fetching chunks for ${pdfName} from API...`);
-      const chunksData = await getChunksByPdfIds([pdfId]);
+      const chunksData = await getChunksByPdfIds([pdfId]);  // Remove timestamp parameter for now
       const pdfChunks = chunksData.chunks || [];
       
       // Update our cache

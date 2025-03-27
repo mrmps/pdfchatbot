@@ -1,7 +1,0 @@
-fastapi==0.115.0
-uvicorn[standard]==0.30.6
-python-multipart==0.0.9
-python-dotenv>=1.0.1
-kdbai-client>=1.0.0
-openai>=1.0.0
-uuid>=0.0.1
