@@ -2,14 +2,16 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
   enabled: process.env.ANALYZE === 'true',
 })
 
-const { FASTAPI_BASE_URL } = require('./lib/constants');
+// Import constants from the CommonJS version
+const { FASTAPI_BASE_URL, getApiUrl } = require('./lib/constants.js');
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   rewrites: async () => {
     return [
+      // Direct routes to the external API
       {
-        source: "/api/py/:path*",
+        source: "/api/:path*",
         destination: `${FASTAPI_BASE_URL}/:path*`,
       },
       {

@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     console.log("Received messages:", JSON.stringify(messages).substring(0, 100) + "...");
 
     // Get the full API URL for listing PDFs
-    const apiUrl = getApiUrl('api/py/list_pdf_names');
+    const apiUrl = getApiUrl('list_pdf_names');
     
     // Create URL with the full API URL
     const url = new URL(apiUrl);
@@ -120,7 +120,7 @@ export async function POST(req: Request) {
             
             try {
               // Get the full API URL for searching
-              const apiUrl = getApiUrl('api/py/search');
+              const apiUrl = getApiUrl('search');
               
               // Create URL with the full API URL
               const url = new URL(apiUrl);

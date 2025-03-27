@@ -118,7 +118,7 @@ export async function uploadPdf(formData: FormData, userId: string): Promise<Upl
       }
     }
 
-    const apiUrl = getApiUrl('api/py/upload_pdf');
+    const apiUrl = getApiUrl('upload_pdf');
     
     console.log("Upload URL:", apiUrl);
     
@@ -230,73 +230,78 @@ export async function uploadPdf(formData: FormData, userId: string): Promise<Upl
   }
 }
 
-export async function listPdfNames(userId: string) {
+export async function listPdfNames(userId: string, timestamp?: number) {
   try {
-    // Create URL using the helper function
-    const url = createApiUrl('api/py/list_pdf_names');
+    // Create the API URL for listing PDFs with a cache-busting timestamp
+    const apiUrl = new URL(getApiUrl('list_pdf_names'));
     
-    url.searchParams.append('user_id', userId);
+    // Add userId as query parameter
+    apiUrl.searchParams.append('user_id', userId);
     
-    console.log("List PDFs URL:", url.toString());
-    
-    const response = await fetch(url.toString());
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Failed to list PDFs: ${response.status} ${response.statusText}`, errorText);
-      const errorData = { error: `${response.status} ${response.statusText}: ${errorText}` };
-      throw new Error(errorData.error || 'Failed to list PDFs');
+    // Add timestamp for cache busting if provided
+    if (timestamp) {
+      apiUrl.searchParams.append('t', timestamp.toString());
     }
     
-    return await response.json();
+    console.log(`Fetching PDFs for user ${userId}`);
+    const response = await fetch(apiUrl.toString(), {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to list PDFs: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    return data;
   } catch (error) {
-    console.error('Error listing PDFs:', error);
-    throw error;
+    console.error('Error listing PDF names:', error);
+    return { success: false, pdfs: [], error: String(error) };
   }
 }
 
-export async function getChunksByPdfIds(pdfIds: string[]) {
+export async function getChunksByPdfIds(pdfIds: string[], timestamp?: number) {
   try {
-    // If no PDF IDs are provided, return empty result
-    if (!pdfIds || pdfIds.length === 0) {
-      return { chunks: [] };
-    }
-
-    // Create URL using the helper function
-    const url = createApiUrl('api/py/get_chunks_by_pdf_ids');
+    // Create the API URL for getting chunks by PDF IDs
+    const apiUrl = new URL(getApiUrl('get_chunks_by_pdf_ids'));
     
-    // Add each PDF ID as a separate query parameter with the same name
+    // Convert IDs array to query params
     pdfIds.forEach(id => {
-      url.searchParams.append('pdf_ids', id);
+      apiUrl.searchParams.append('pdf_ids', id);
     });
     
-    console.log("Fetching chunks with URL:", url.toString());
-    
-    const response = await fetch(url.toString());
-    
-    if (!response.ok) {
-      // Log the full response for debugging
-      const errorText = await response.text();
-      console.error("Error response from API:", errorText);
-      
-      try {
-        const errorData = JSON.parse(errorText);
-        throw new Error(errorData.detail || 'Failed to get chunks');
-      } catch (parseError) {
-        throw new Error(`Failed to get chunks: ${response.status} ${response.statusText}`);
-      }
+    // Add timestamp for cache busting if provided
+    if (timestamp) {
+      apiUrl.searchParams.append('t', timestamp.toString());
     }
     
-    return await response.json();
+    const response = await fetch(apiUrl.toString(), {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get chunks: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    return data;
   } catch (error) {
-    console.error('Error getting chunks:', error);
-    // Return empty chunks instead of throwing to prevent UI errors
-    return { chunks: [] };
+    console.error('Error getting chunks by PDF IDs:', error);
+    return { success: false, chunks: [], error: String(error) };
   }
 }
 
 export async function getAllUserChunks(userId: string) {
   try {
+    // Get all chunks for a user (no PDF ID filter)
+    const apiUrl = new URL(getApiUrl('get_chunks_by_pdf_ids'));
+    
     // First get all PDF IDs for the user
     const pdfListResponse = await listPdfNames(userId);
     const pdfList = pdfListResponse.pdfs || [];
@@ -319,19 +324,19 @@ export async function getAllUserChunks(userId: string) {
 // Function to search for relevant chunks
 export async function searchChunks(query: string, userId: string, pdfIds?: string[]) {
   try {
-    // Create URL using the helper function
-    const url = createApiUrl('api/py/search');
+    // Create the search API URL
+    const apiUrl = new URL(getApiUrl('search'));
     
-    url.searchParams.append('user_id', userId);
-    url.searchParams.append('query', query);
+    apiUrl.searchParams.append('user_id', userId);
+    apiUrl.searchParams.append('query', query);
     
     if (pdfIds && pdfIds.length > 0) {
-      pdfIds.forEach(id => url.searchParams.append('pdf_id', id));
+      pdfIds.forEach(id => apiUrl.searchParams.append('pdf_id', id));
     }
     
-    console.log("Search URL:", url.toString());
+    console.log("Search URL:", apiUrl.toString());
     
-    const response = await fetch(url.toString());
+    const response = await fetch(apiUrl.toString());
     
     if (!response.ok) {
       const errorText = await response.text();

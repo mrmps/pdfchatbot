@@ -1,27 +1,20 @@
-export const APP_BASE_URL = process.env.NODE_ENV === 'development' 
-  ? 'http://localhost:3000' 
-  : 'https://chatpdfkdbai.vercel.app';
+// Import constant values from the CommonJS file for consistency
+// We need to use require here since we're importing from a CommonJS module
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const jsConstants = require('./constants.js');
+
+// Export all constants with TypeScript typing
+export const APP_BASE_URL: string = jsConstants.APP_BASE_URL;
+export const FASTAPI_BASE_URL: string = jsConstants.FASTAPI_BASE_URL;
 
 // Base URL for API endpoints
 export const API_BASE_URL = `${APP_BASE_URL}`;
 
-// Base URL for FastAPI endpoints (now the external Replit backend)
-export const FASTAPI_BASE_URL = 'https://pdfchat.replit.app';
-
 /**
  * Creates a full API URL for a given endpoint
- * @param endpoint The API endpoint path (e.g., "api/py/upload_pdf")
- * @returns The complete API URL
+ * @param endpoint The API endpoint path (e.g., "upload_pdf")
+ * @returns The complete API URL pointing to the external API
  */
 export function getApiUrl(endpoint: string): string {
-  // Remove any leading slash from the endpoint
-  const cleanEndpoint = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
-  
-  // Replace api/py/ prefix with empty string for the new backend
-  if (cleanEndpoint.startsWith('api/py/')) {
-    const newEndpoint = cleanEndpoint.replace('api/py/', '');
-    return `${FASTAPI_BASE_URL}/${newEndpoint}`;
-  }
-  
-  return `${API_BASE_URL}/${cleanEndpoint}`;
+  return jsConstants.getApiUrl(endpoint);
 } 
