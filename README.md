@@ -5,18 +5,18 @@
   <h3 align="center">Chat with your PDFs using AI and vector search</h3>
 </p>
 
-<p align="center">Built on the <a href="https://github.com/digitros/nextjs-fastapi">Next.js FastAPI Starter</a> template, deployable as a single application on Vercel.</p>
+<p align="center">Frontend built with Next.js, connected to an external FastAPI backend.</p>
 
 ## Introduction
 
-This application allows users to upload PDFs, process them into searchable chunks, and chat with their documents using AI. It combines Next.js for the frontend with Python's AI capabilities on the backend, all deployable as a single application on Vercel.
+This application allows users to upload PDFs, process them into searchable chunks, and chat with their documents using AI. It combines Next.js for the frontend with an external FastAPI backend for AI capabilities, all deployable as a single application on Vercel.
 
 ## Key Features
 
-- **PDF Processing**: Upload and process PDFs using PyPDF2
+- **Client-side PDF Processing**: Upload and process PDFs directly in the browser
 - **Vector Search**: Store and query document chunks using KDB.AI vector database
 - **AI Chat**: Interact with your documents using natural language
-- **Single Deployment**: Deploy both frontend and backend on Vercel
+- **External API Integration**: Connect to the FastAPI backend hosted at pdfchat.replit.app
 - **No Login Required**: Uses fingerprinting for anonymous user identification
 - **AI SDK Tool Calling**: Uses Vercel's AI SDK for structured tool execution
 
@@ -24,8 +24,8 @@ This application allows users to upload PDFs, process them into searchable chunk
 
 The application consists of:
 
-1. **Next.js Frontend**: Handles UI and user interactions
-2. **FastAPI Backend**: Processes PDFs and manages vector database operations
+1. **Next.js Frontend**: Handles UI, user interactions, and client-side PDF processing
+2. **External FastAPI Backend**: Manages vector database operations and AI search
 3. **KDB.AI**: Vector database for semantic search
 4. **OpenAI**: Provides embeddings and AI capabilities
 5. **Vercel AI SDK**: Manages tool calling and AI interactions
@@ -33,23 +33,19 @@ The application consists of:
 ```mermaid
 graph TD
     User[User] --> Frontend[Next.js Frontend]
-    Frontend --> UploadPDF[Upload PDF]
+    Frontend --> UploadPDF[Upload & Process PDF]
     Frontend --> ChatInterface[Chat Interface]
     Frontend --> ViewPDF[View PDF Content]
     
-    UploadPDF --> FastAPI[FastAPI Backend]
+    UploadPDF -- Client-side processing --> TextChunking[Text Chunking]
+    TextChunking --> Backend[External FastAPI Backend]
     ChatInterface --> NextRoutes[Next.js API Routes]
-    ViewPDF --> FastAPI
-    
-    FastAPI --> PyPDF2[PyPDF2 Text Extraction]
-    PyPDF2 --> TextChunking[Text Chunking]
-    TextChunking --> Embeddings[OpenAI Embeddings]
-    Embeddings --> KDBAI[KDB.AI Vector Database]
+    ViewPDF --> Frontend
     
     NextRoutes --> AITools[AI SDK Tools]
     AITools --> SearchPDFs[searchPdfs Tool]
-    SearchPDFs --> FastAPI
-    FastAPI --> KDBAI
+    SearchPDFs --> Backend
+    Backend --> KDBAI[KDB.AI Vector Database]
     
     KDBAI --> Results[Search Results]
     Results --> AITools
@@ -62,16 +58,17 @@ graph TD
 ### PDF Processing Flow
 
 1. User uploads PDFs through the UI
-2. FastAPI backend extracts text using PyPDF2
-3. Text is split into manageable chunks
-4. OpenAI generates embeddings for each chunk
-5. Chunks and embeddings are stored in KDB.AI vector database
+2. PDF text is extracted directly in the browser using client-side JavaScript
+3. Text is split into manageable chunks in the browser
+4. Chunks are sent to the external backend
+5. The backend generates embeddings using OpenAI
+6. Chunks and embeddings are stored in KDB.AI vector database
 
 ### Chat Flow
 
 1. User asks a question about their documents
 2. AI uses the `searchPdfs` tool to find relevant information
-3. The tool queries KDB.AI for semantically similar content
+3. The tool queries the external API, which searches KDB.AI for semantically similar content
 4. Results are formatted and returned to the AI
 5. AI generates a response based on the retrieved information
 
@@ -88,7 +85,7 @@ searchPdfs: tool({
     searchMode: z.enum(['unified', 'individual']).optional().describe('Search mode')
   }),
   execute: async ({ query, pdfIds, searchMode = "unified" }) => {
-    // Implementation that searches KDB.AI and returns formatted results
+    // Implementation that searches through the external API
   }
 })
 ```
@@ -101,9 +98,10 @@ The AI SDK handles:
 
 ### Deployment Architecture
 
-This project leverages the [Next.js FastAPI Starter template](https://github.com/digitros/nextjs-fastapi), which allows for deploying both the Next.js frontend and Python/FastAPI backend as a single application on Vercel.
-
-The Python/FastAPI server is mapped into the Next.js app under `/api/`, implemented using `next.config.js` rewrites. This architecture means you don't need to deploy the backend and frontend separately.
+This project now connects to an external FastAPI backend hosted at pdfchat.replit.app, which means:
+1. The frontend can be deployed as a standalone Next.js application
+2. No need to deploy a Python backend as part of the application
+3. All PDF processing happens in the browser, reducing server load
 
 ## Environment Setup
 
@@ -113,18 +111,11 @@ Create a `.env.local` file with:
 KDBAI_ENDPOINT="your-kdb-ai-endpoint"
 KDBAI_API_KEY="your-kdb-ai-api-key"
 OPENAI_API_KEY="your-openai-api-key"
-NEXT_PUBLIC_API_URL="http://127.0.0.1:8000"
 ```
 
 ## Local Development
 
-1. Create and activate a virtual environment:
-```bash
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-2. Install dependencies:
+Install dependencies:
 ```bash
 npm install
 # or
@@ -133,7 +124,7 @@ yarn
 pnpm install
 ```
 
-3. Run the development server:
+Run the development server:
 ```bash
 npm run dev
 # or
@@ -142,7 +133,7 @@ yarn dev
 pnpm dev
 ```
 
-This will start both the Next.js frontend and FastAPI backend. The frontend will be available at http://localhost:3000 and the API at http://127.0.0.1:8000.
+This will start the Next.js frontend. The API calls will use the external backend at pdfchat.replit.app.
 
 ## Deploy Your Own
 
@@ -154,8 +145,6 @@ You can clone & deploy it to Vercel with one click:
 
 - [KDB.AI](https://kdb.ai/) - Get your own KDB.AI vector database
 - [KDB.AI Documentation](https://code.kx.com/kdbai/latest) - Learn about KDB.AI vector database
-- [Next.js FastAPI Starter](https://github.com/digitros/nextjs-fastapi) - The template this project is based on
-- [PyPDF2 Documentation](https://pypdf2.readthedocs.io/) - PDF processing library
 - [OpenAI Documentation](https://platform.openai.com/docs/) - For embeddings and AI capabilities
 - [Next.js Documentation](https://nextjs.org/docs) - Learn about Next.js features and API
 - [FastAPI Documentation](https://fastapi.tiangolo.com/) - Learn about FastAPI features and API
