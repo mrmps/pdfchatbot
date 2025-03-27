@@ -1,11 +1,11 @@
-// Import constant values from the CommonJS file for consistency
-// We need to use require here since we're importing from a CommonJS module
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const jsConstants = require('./constants.js');
+// Define constants independently in TypeScript
+// Make sure to keep these values in sync with constants.js
+export const APP_BASE_URL: string = process.env.NODE_ENV === 'development' 
+  ? 'http://localhost:3000' 
+  : 'https://chatpdfkdbai.vercel.app';
 
-// Export all constants with TypeScript typing
-export const APP_BASE_URL: string = jsConstants.APP_BASE_URL;
-export const FASTAPI_BASE_URL: string = jsConstants.FASTAPI_BASE_URL;
+// Base URL for FastAPI endpoints (now the external Replit backend)
+export const FASTAPI_BASE_URL: string = 'https://pdfchat.replit.app';
 
 // Base URL for API endpoints
 export const API_BASE_URL = `${APP_BASE_URL}`;
@@ -16,5 +16,9 @@ export const API_BASE_URL = `${APP_BASE_URL}`;
  * @returns The complete API URL pointing to the external API
  */
 export function getApiUrl(endpoint: string): string {
-  return jsConstants.getApiUrl(endpoint);
+  // Remove any leading slash from the endpoint
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
+  
+  // Use FASTAPI_BASE_URL for all endpoints
+  return `${FASTAPI_BASE_URL}/${cleanEndpoint}`;
 } 
