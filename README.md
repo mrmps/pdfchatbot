@@ -1,7 +1,7 @@
 # PDF Chat with KDB.AI
 
 <p align="center">
-  <img src="https://images.squarespace-cdn.com/content/v1/647d8c96bffcb2144748f3fb/1705538561045-CHWGG2BXH9B2DTTD6FH6/KDB-AI_GlyphLoop_cover.gif" height="96">
+  <img src="https://images.squarespace.cdn.com/content/v1/647d8c96bffcb2144748f3fb/1705538561045-CHWGG2BXH9B2DTTD6FH6/KDB-AI_GlyphLoop_cover.gif" height="96">
   <h3 align="center">Chat with your PDFs using AI and vector search</h3>
 </p>
 
@@ -25,7 +25,7 @@ This application allows users to upload PDFs, process them into searchable chunk
 The application consists of:
 
 1. **Next.js Frontend**: Handles UI, user interactions, and client-side PDF processing
-2. **External FastAPI Backend**: Manages vector database operations and AI search
+2. **External FastAPI Backend**: Manages vector database operations and AI search (a simple FastAPI backend hosted at https://replit.com/@MichaelR35/KDBAI-PDF-Chatbot-Backend
 3. **KDB.AI**: Vector database for semantic search
 4. **OpenAI**: Provides embeddings and AI capabilities
 5. **Vercel AI SDK**: Manages tool calling and AI interactions
