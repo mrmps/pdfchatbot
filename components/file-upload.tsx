@@ -192,7 +192,21 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
       
       // Process PDFs client-side instead of uploading to the API
       setProgress(15);
-      const result = await clientProcessPdfs(files, userId);
+      // Process PDFs using the server-side API
+      const formData = new FormData();
+      
+      // Append each file to the form data
+      for (const pdfFile of files) {
+        formData.append('pdfFile', pdfFile);
+      }
+      formData.append('userId', userId);
+      
+      const response = await fetch('/api/parse-pdfs', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      const result = await response.json();
       
       if (!result.success) {
         throw new Error(result.error || 'Failed to process PDFs');
@@ -239,12 +253,12 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
       if (totalChunks > 1000) {
         setStatusMessage({
           type: 'info',
-          text: `Processing ${totalChunks.toLocaleString()} chunks (this may take several minutes)`
+          text: `Processing ${totalChunks.toLocaleString()} chunks (this may take a minute)`
         });
       } else if (totalChunks > 300) {
         setStatusMessage({
           type: 'info',
-          text: `Processing ${totalChunks.toLocaleString()} chunks (this may take a minute or two)`
+          text: `Processing ${totalChunks.toLocaleString()} chunks (this may take a few seconds)`
         });
       } else {
         setStatusMessage({

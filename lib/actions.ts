@@ -352,3 +352,91 @@ export async function searchChunks(query: string, userId: string, pdfIds?: strin
   }
 }
 
+/**
+ * Parse multiple PDF files using the server-side parse-pdfs API
+ * @param pdfFiles Array of PDF files to parse
+ * @param userId The user ID for tracking
+ * @returns The parsed PDF content with chunks
+ */
+export async function parsePdfs(
+  pdfFiles: File[],
+  userId: string
+): Promise<{ success: boolean; results: any[]; error?: string }> {
+  try {
+    console.log(`Parsing ${pdfFiles.length} PDF files...`);
+    
+    // Process each PDF file individually
+    const results = [];
+    let hasErrors = false;
+    
+    for (const pdfFile of pdfFiles) {
+      console.log(`Processing ${pdfFile.name}...`);
+      // Create form data for this PDF
+      const formData = new FormData();
+      formData.append('pdfFile', pdfFile);
+      formData.append('userId', userId);
+      
+      // Get the API URL for parsing PDFs
+      const apiUrl = getApiUrl('parse-pdfs');
+      console.log(`Sending request to ${apiUrl}`);
+      
+      try {
+        // Send request to parse the PDF
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          body: formData,
+        });
+        
+        if (!response.ok) {
+          // Handle error response
+          let errorInfo;
+          try {
+            errorInfo = await response.json();
+          } catch (e) {
+            errorInfo = { message: `${response.status}: ${response.statusText}` };
+          }
+          
+          console.error(`Error parsing ${pdfFile.name}:`, errorInfo);
+          hasErrors = true;
+          
+          // Add error result
+          results.push({
+            fileName: pdfFile.name,
+            success: false,
+            error: errorInfo.message || errorInfo.error || 'Failed to parse PDF',
+          });
+        } else {
+          // Process successful response
+          const result = await response.json();
+          console.log(`Successfully parsed ${pdfFile.name}: ${result.chunkCount} chunks from ${result.pageCount} pages`);
+          results.push(result);
+        }
+      } catch (error) {
+        // Handle request error
+        console.error(`Error sending request for ${pdfFile.name}:`, error);
+        hasErrors = true;
+        results.push({
+          fileName: pdfFile.name,
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+    
+    // Return combined results
+    return {
+      success: !hasErrors, // Overall success if no errors
+      results: results,
+    };
+    
+  } catch (error) {
+    // Handle overall process error
+    console.error('Error in parsePdfs function:', error);
+    return {
+      success: false,
+      results: [],
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
