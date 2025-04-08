@@ -299,9 +299,6 @@ export async function getChunksByPdfIds(pdfIds: string[], timestamp?: number) {
 
 export async function getAllUserChunks(userId: string) {
   try {
-    // Get all chunks for a user (no PDF ID filter)
-    const apiUrl = new URL(getApiUrl('get_chunks_by_pdf_ids'));
-    
     // First get all PDF IDs for the user
     const pdfListResponse = await listPdfNames(userId);
     const pdfList = pdfListResponse.pdfs || [];
