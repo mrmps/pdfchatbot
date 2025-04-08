@@ -89,7 +89,7 @@ An interesting aspect is that the LLM decides which PDFs to search when a user a
 Moving from client-side to server-side PDF processing involved creating a dedicated API route using LangChain's PDFLoader. Here's a simplified version:
 
 ```typescript
-// app/api/parse-pdfs/route.ts
+// app/api/parse-pdf/route.ts
 export async function POST(request: NextRequest) {
   try {
     // Get form data with PDF files and user ID
@@ -359,7 +359,7 @@ An interesting aspect is that the LLM decides which PDFs to search when a user a
 Moving from client-side to server-side PDF processing involved creating a dedicated API route using LangChain's PDFLoader. Here's a simplified version:
 
 ```typescript
-// app/api/parse-pdfs/route.ts
+// app/api/parse-pdf/route.ts
 export async function POST(request: NextRequest) {
   try {
     // Get form data with PDF files and user ID

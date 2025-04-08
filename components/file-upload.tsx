@@ -200,7 +200,7 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
       }
       formData.append('userId', userId);
       
-      const response = await fetch('/api/parse-pdfs', {
+      const response = await fetch('/api/parse-pdf', {
         method: 'POST',
         body: formData,
       });

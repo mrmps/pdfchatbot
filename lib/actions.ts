@@ -350,7 +350,7 @@ export async function searchChunks(query: string, userId: string, pdfIds?: strin
 }
 
 /**
- * Parse multiple PDF files using the server-side parse-pdfs API
+ * Parse multiple PDF files using the server-side parse-pdf API
  * @param pdfFiles Array of PDF files to parse
  * @param userId The user ID for tracking
  * @returns The parsed PDF content with chunks
@@ -374,7 +374,7 @@ export async function parsePdfs(
       formData.append('userId', userId);
       
       // Get the API URL for parsing PDFs
-      const apiUrl = getApiUrl('parse-pdfs');
+      const apiUrl = getApiUrl('parse-pdf');
       console.log(`Sending request to ${apiUrl}`);
       
       try {
