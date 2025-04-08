@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Upload, FileTextIcon, GithubIcon } from "lucide-react";
 import { PdfViewerDialog } from "@/components/pdf-viewer-dialog";
 import Image from "next/image";
+import { usePlausible } from 'next-plausible';
 import {
   Credenza,
   CredenzaContent,
@@ -18,6 +19,20 @@ import {
 export default function Home() {
   const [viewingContent, setViewingContent] = useState(false);
   const [uploadingPdf, setUploadingPdf] = useState(false);
+  const plausible = usePlausible();
+
+  const handleUploadComplete = (files?: File[]) => {
+    // Track PDF upload with general info
+    if (files && files.length > 0) {
+      plausible('pdfUpload', {
+        props: {
+          fileCount: files.length,
+          fileName: files[0].name
+        }
+      });
+    }
+    setUploadingPdf(false);
+  };
 
   return (
     <div className="flex flex-col h-[100dvh]">
@@ -65,7 +80,7 @@ export default function Home() {
                   </p>
                 </CredenzaHeader>
                 <div className="p-4 sm:p-5">
-                  <FileUpload onUploadComplete={() => setUploadingPdf(false)} />
+                  <FileUpload onUploadComplete={handleUploadComplete} />
                 </div>
               </CredenzaContent>
             </Credenza>

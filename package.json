@@ -38,6 +38,7 @@
     "lucide-react": "^0.483.0",
     "marked": "^15.0.7",
     "next": "^15.2.4",
+    "next-plausible": "^3.12.4",
     "path": "^0.12.7",
     "pdf-parse": "^1.1.1",
     "postcss": "^8.4.47",
