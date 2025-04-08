@@ -350,7 +350,7 @@ export async function searchChunks(query: string, userId: string, pdfIds?: strin
 }
 
 /**
- * Parse multiple PDF files using the server-side parse-pdf API
+ * Parse multiple PDF files using the FastAPI process-pdfs endpoint
  * @param pdfFiles Array of PDF files to parse
  * @param userId The user ID for tracking
  * @returns The parsed PDF content with chunks
@@ -366,57 +366,79 @@ export async function parsePdfs(
     const results = [];
     let hasErrors = false;
     
+    // Create a single FormData object to send all files at once
+    const formData = new FormData();
+    
+    // Append all files to the form data with the same field name 'pdfFiles'
     for (const pdfFile of pdfFiles) {
-      console.log(`Processing ${pdfFile.name}...`);
-      // Create form data for this PDF
-      const formData = new FormData();
-      formData.append('pdfFile', pdfFile);
-      formData.append('userId', userId);
+      console.log(`Adding ${pdfFile.name} to form data...`);
+      formData.append('pdfFiles', pdfFile);
+    }
+    
+    // Add user ID
+    formData.append('userId', userId);
+    
+    // Get the API URL for parsing PDFs (now points to process-pdfs)
+    const apiUrl = getApiUrl('parse-pdf');
+    console.log(`Sending request to ${apiUrl}`);
+    
+    try {
+      // Send request to parse the PDFs
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        body: formData,
+      });
       
-      // Get the API URL for parsing PDFs
-      const apiUrl = getApiUrl('parse-pdf');
-      console.log(`Sending request to ${apiUrl}`);
-      
-      try {
-        // Send request to parse the PDF
-        const response = await fetch(apiUrl, {
-          method: 'POST',
-          body: formData,
-        });
+      if (!response.ok) {
+        // Handle error response
+        let errorInfo;
+        try {
+          errorInfo = await response.json();
+        } catch (e) {
+          errorInfo = { message: `${response.status}: ${response.statusText}` };
+        }
         
-        if (!response.ok) {
-          // Handle error response
-          let errorInfo;
-          try {
-            errorInfo = await response.json();
-          } catch (e) {
-            errorInfo = { message: `${response.status}: ${response.statusText}` };
+        console.error(`Error parsing PDFs:`, errorInfo);
+        throw new Error(errorInfo.message || errorInfo.error || 'Failed to parse PDFs');
+      }
+      
+      // Process successful response
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to process PDFs');
+      }
+      
+      // The response format should include pdfs array with processed documents
+      if (result.pdfs && Array.isArray(result.pdfs)) {
+        // Process each PDF result
+        for (const pdfResult of result.pdfs) {
+          if (pdfResult.success) {
+            console.log(`Successfully parsed ${pdfResult.fileName}: ${pdfResult.chunkCount} chunks from ${pdfResult.pageCount} pages`);
+          } else {
+            console.error(`Error parsing ${pdfResult.fileName}:`, pdfResult.error);
+            hasErrors = true;
           }
-          
-          console.error(`Error parsing ${pdfFile.name}:`, errorInfo);
-          hasErrors = true;
-          
-          // Add error result
+          results.push(pdfResult);
+        }
+      } else {
+        throw new Error('Invalid response format from PDF processing service');
+      }
+      
+    } catch (error) {
+      // Handle request error
+      console.error(`Error processing PDFs:`, error);
+      hasErrors = true;
+      
+      // If we have no detailed errors for individual files, create a generic error
+      if (results.length === 0) {
+        for (const pdfFile of pdfFiles) {
           results.push({
             fileName: pdfFile.name,
             success: false,
-            error: errorInfo.message || errorInfo.error || 'Failed to parse PDF',
+            error: error instanceof Error ? error.message : String(error),
           });
-        } else {
-          // Process successful response
-          const result = await response.json();
-          console.log(`Successfully parsed ${pdfFile.name}: ${result.chunkCount} chunks from ${result.pageCount} pages`);
-          results.push(result);
         }
-      } catch (error) {
-        // Handle request error
-        console.error(`Error sending request for ${pdfFile.name}:`, error);
-        hasErrors = true;
-        results.push({
-          fileName: pdfFile.name,
-          success: false,
-          error: error instanceof Error ? error.message : String(error),
-        });
       }
     }
     

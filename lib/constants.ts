@@ -19,9 +19,9 @@ export function getApiUrl(endpoint: string): string {
   // Remove any leading slash from the endpoint
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
   
-  // Use local API for the parse-pdf endpoint, since it's not on the remote server
+  // Use the FastAPI process-pdfs endpoint instead of the local parse-pdf endpoint
   if (cleanEndpoint === 'parse-pdf') {
-    return `${API_BASE_URL}/api/${cleanEndpoint}`;
+    return `${FASTAPI_BASE_URL}/process-pdfs`;
   }
   
   // Use FASTAPI_BASE_URL for all other endpoints

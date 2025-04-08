@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { uploadPdf } from "@/lib/actions"
 import { getUserId } from "@/lib/user-id"
 import { cn } from "@/lib/utils"
+import { getApiUrl } from "@/lib/constants"
 import { 
   Tooltip,
   TooltipContent,
@@ -196,11 +197,14 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
       
       // Append each file to the form data
       for (const pdfFile of files) {
-        formData.append('pdfFile', pdfFile);
+        formData.append('pdfFiles', pdfFile);
       }
       formData.append('userId', userId);
       
-      const response = await fetch('/api/parse-pdf', {
+      // Get the API URL for the PDF processing endpoint
+      const apiUrl = getApiUrl('parse-pdf');
+      
+      const response = await fetch(apiUrl, {
         method: 'POST',
         body: formData,
       });
@@ -216,12 +220,17 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
       setProcessingStage('Extracting text')
       
       // Process the chunks from the PDF processing result
+      // The response format now comes from FastAPI process-pdfs endpoint
       const parsed: {[filename: string]: ParsedChunk[]} = {};
       let totalChunks = 0;
       
       result.pdfs.forEach((pdf: any) => {
         if (pdf.success) {
-          parsed[pdf.fileName] = pdf.chunks;
+          // Map the chunks from the new format
+          parsed[pdf.fileName] = pdf.chunks.map((chunk: any) => ({
+            text: chunk.text,
+            metadata: chunk.metadata || {}
+          }));
           totalChunks += pdf.chunks.length;
         }
       });
