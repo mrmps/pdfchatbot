@@ -9,11 +9,11 @@
 
 ## Introduction
 
-This application allows users to upload PDFs, process them into searchable chunks, and chat with their documents using AI. It combines Next.js for the frontend with an external FastAPI backend for AI capabilities, all deployable as a single application on Vercel.
+This application allows users to upload PDFs, process them into searchable chunks, and chat with their documents using AI. It combines Next.js for the frontend with an external FastAPI backend for AI capabilities and PDF processing, all deployable as a single application on Vercel.
 
 ## Key Features
 
-- **Client-side PDF Processing**: Upload and process PDFs directly in the browser
+- **Python-based PDF Processing**: Upload PDFs to a dedicated FastAPI backend for high-quality parsing
 - **Vector Search**: Store and query document chunks using KDB.AI vector database
 - **AI Chat**: Interact with your documents using natural language
 - **External API Integration**: Connect to the FastAPI backend hosted at pdfchat.replit.app
@@ -24,8 +24,8 @@ This application allows users to upload PDFs, process them into searchable chunk
 
 The application consists of:
 
-1. **Next.js Frontend**: Handles UI, user interactions, and client-side PDF processing
-2. **External FastAPI Backend**: Manages vector database operations and AI search (a simple FastAPI backend hosted at https://replit.com/@MichaelR35/KDBAI-PDF-ChatBot-Backend)
+1. **Next.js Frontend**: Handles UI and user interactions
+2. **External FastAPI Backend**: Manages PDF processing, vector database operations, and AI search (a Python backend hosted at https://replit.com/@MichaelR35/KDBAI-PDF-ChatBot-Backend)
 3. **KDB.AI**: Vector database for semantic search
 4. **OpenAI**: Provides embeddings and AI capabilities
 5. **Vercel AI SDK**: Manages tool calling and AI interactions
@@ -33,19 +33,21 @@ The application consists of:
 ```mermaid
 graph TD
     User[User] --> Frontend[Next.js Frontend]
-    Frontend --> UploadPDF[Upload & Process PDF]
+    Frontend --> UploadPDF[Upload PDF]
     Frontend --> ChatInterface[Chat Interface]
     Frontend --> ViewPDF[View PDF Content]
     
-    UploadPDF -- Client-side processing --> TextChunking[Text Chunking]
-    TextChunking --> Backend[External FastAPI Backend]
+    UploadPDF --> Backend[External FastAPI Backend]
+    Backend --> PDFProcessing[Python PDF Processing]
+    PDFProcessing --> TextChunking[Text Chunking]
     ChatInterface --> NextRoutes[Next.js API Routes]
     ViewPDF --> Frontend
     
     NextRoutes --> AITools[AI SDK Tools]
     AITools --> SearchPDFs[searchPdfs Tool]
     SearchPDFs --> Backend
-    Backend --> KDBAI[KDB.AI Vector Database]
+    TextChunking --> KDBAI[KDB.AI Vector Database]
+    Backend --> KDBAI
     
     KDBAI --> Results[Search Results]
     Results --> AITools
@@ -58,9 +60,9 @@ graph TD
 ### PDF Processing Flow
 
 1. User uploads PDFs through the UI
-2. PDF text is extracted directly in the browser using client-side JavaScript
-3. Text is split into manageable chunks in the browser
-4. Chunks are sent to the external backend
+2. PDFs are sent directly to the FastAPI backend
+3. The backend processes PDFs using Python-based libraries (PyPDF via LangChain)
+4. Text is extracted and split into manageable chunks
 5. The backend generates embeddings using OpenAI
 6. Chunks and embeddings are stored in KDB.AI vector database
 
@@ -100,8 +102,9 @@ The AI SDK handles:
 
 This project now connects to an external FastAPI backend hosted at pdfchat.replit.app, which means:
 1. The frontend can be deployed as a standalone Next.js application
-2. No need to deploy a Python backend as part of the application
-3. All PDF processing happens in the browser, reducing server load
+2. The backend handles all PDF processing, eliminating client-side and serverless limitations
+3. Better quality PDF parsing using Python-based tools
+4. No serverless function limits for PDF size or processing time
 
 ## Environment Setup
 
@@ -133,7 +136,7 @@ yarn dev
 pnpm dev
 ```
 
-This will start the Next.js frontend. The API calls will use the external backend at pdfchat.replit.app.
+This will start the Next.js frontend. The API calls will use the external backend at pdfchat.replit.app for PDF processing and vector operations.
 
 ## Deploy Your Own
 
