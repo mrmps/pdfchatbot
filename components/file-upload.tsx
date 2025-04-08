@@ -13,7 +13,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { clientProcessPdfs } from "@/lib/client-pdf-parser"
 
 interface FileUploadProps {
   onUploadComplete: (files?: File[]) => void
