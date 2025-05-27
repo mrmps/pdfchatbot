@@ -3,7 +3,7 @@ import "./globals.css"
 import type { Metadata } from "next"
 import { GeistSans } from "geist/font/sans"
 import { ThemeProvider } from "@/components/theme-provider"
-import PlausibleProvider from "next-plausible"
+import { Analytics } from "@vercel/analytics/react"
 
 export const metadata: Metadata = {
   title: 'PDF Chat',
@@ -57,11 +57,10 @@ export default function RootLayout({
           defaultTheme="system"
           enableSystem
         >
-          <PlausibleProvider domain="pdfgpt.dev">
-            <div vaul-drawer-wrapper="" className="bg-background">
-              <main className="min-h-screen bg-background">{children}</main>
-            </div>
-          </PlausibleProvider>
+          <div vaul-drawer-wrapper="" className="bg-background">
+            <main className="min-h-screen bg-background">{children}</main>
+          </div>
+          <Analytics />
         </ThemeProvider>
       </body>
     </html>
